@@ -104,6 +104,39 @@ class ChatAskRequest(BaseModel):
     paper_ids: Optional[list[UUID]] = None  # None = search all papers
 
 
+# ── Compare ───────────────────────────────────────────────────────────────────
+
+class CompareRequest(BaseModel):
+    paper_ids: list[UUID]
+
+
+class ComparisonTableRow(BaseModel):
+    aspect: str
+    values: list[str]
+
+
+class CompareResponse(BaseModel):
+    overview: str
+    similarities: list[str]
+    differences: list[str]
+    comparison_table: list[ComparisonTableRow]
+    recommendation: str
+    paper_titles: list[str]
+
+
+# ── Quiz ──────────────────────────────────────────────────────────────────────
+
+class QuizQuestion(BaseModel):
+    question: str
+    answer: str
+    paper_id: UUID
+    paper_title: str
+
+
+class QuizResponse(BaseModel):
+    questions: list[QuizQuestion]
+
+
 # ── Worker job ────────────────────────────────────────────────────────────────
 
 class JobStatus(BaseModel):

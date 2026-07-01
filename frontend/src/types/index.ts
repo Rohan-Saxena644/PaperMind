@@ -61,3 +61,24 @@ export interface Chat {
   created_at: string
   messages: Message[]
 }
+
+export interface ComparisonRow {
+  aspect: string
+  values: string[]
+}
+
+export interface Comparison {
+  overview: string
+  similarities: string[]
+  differences: string[]
+  comparison_table: ComparisonRow[]
+  recommendation: string
+  paper_titles: string[]
+}
+
+export interface QuizQuestion {
+  question: string
+  answer: string
+  paper_id: string
+  paper_title: string
+}

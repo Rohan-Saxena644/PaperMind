@@ -91,6 +91,50 @@ Return this exact JSON structure:
 
 
 @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
+def compare_papers(papers: list[dict]) -> dict:
+    """
+    papers: list of {"title": str, "summary_long": str, "key_contributions": list[str]}
+    Returns structured comparison JSON.
+    """
+    papers_text = "\n\n".join([
+        f"--- Paper: {p['title']} ---\n"
+        f"Summary: {p['summary_long']}\n"
+        f"Key contributions: {', '.join(p['key_contributions'] or [])}"
+        for p in papers
+    ])
+
+    prompt = f"""You are a research assistant comparing multiple academic papers. Return ONLY valid JSON.
+
+{papers_text}
+
+Return this exact JSON structure:
+{{
+  "overview": "2-3 sentence high level comparison",
+  "similarities": ["similarity 1", "similarity 2", "similarity 3"],
+  "differences": ["difference 1", "difference 2", "difference 3"],
+  "comparison_table": [
+    {{"aspect": "Approach", "values": ["paper 1 value", "paper 2 value"]}},
+    {{"aspect": "Key innovation", "values": ["paper 1 value", "paper 2 value"]}},
+    {{"aspect": "Limitations", "values": ["paper 1 value", "paper 2 value"]}}
+  ],
+  "recommendation": "1-2 sentences on when to use which approach, or how they complement each other"
+}}
+
+The comparison_table "values" array must have exactly {len(papers)} items, in the same order as the papers above."""
+
+    response = _model.generate_content(prompt)
+    text = response.text.strip()
+
+    if text.startswith("```"):
+        text = text.split("```")[1]
+        if text.startswith("json"):
+            text = text[4:]
+    text = text.strip()
+
+    return json.loads(text)
+
+
+@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
 def answer_question(question: str, context_chunks: list[dict]) -> str:
     context = "\n\n---\n\n".join([
         f"[From: {c['paper_title']}]\n{c['content']}"

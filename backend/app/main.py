@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.db.session import engine
 from app.models.models import Base
-from app.api.routes import auth, papers, chat
+from app.api.routes import auth, papers, chat, compare
 
 # Create all tables on startup
 Base.metadata.create_all(bind=engine)
@@ -28,6 +28,7 @@ app.add_middleware(
 app.include_router(auth.router, prefix="/api/v1")
 app.include_router(papers.router, prefix="/api/v1")
 app.include_router(chat.router, prefix="/api/v1")
+app.include_router(compare.router, prefix="/api/v1")
 
 
 @app.get("/health")

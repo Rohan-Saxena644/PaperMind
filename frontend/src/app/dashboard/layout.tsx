@@ -3,7 +3,7 @@
 import { useEffect } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
-import { BookOpen, MessageSquare, LayoutDashboard, LogOut } from 'lucide-react'
+import { BookOpen, MessageSquare, LayoutDashboard, LogOut, GitCompare, Brain } from 'lucide-react'
 import { useAuthStore } from '@/lib/store'
 import clsx from 'clsx'
 
@@ -11,6 +11,8 @@ const navItems = [
   { href: '/dashboard', label: 'Overview', icon: LayoutDashboard },
   { href: '/papers', label: 'Papers', icon: BookOpen },
   { href: '/chat', label: 'Ask AI', icon: MessageSquare },
+  { href: '/compare', label: 'Compare', icon: GitCompare },
+  { href: '/quiz', label: 'Quiz', icon: Brain },
 ]
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
@@ -32,7 +34,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex h-screen overflow-hidden">
-      {/* Sidebar — the "archive" half */}
       <aside className="w-56 flex-shrink-0 bg-parchment border-r border-parchment-border flex flex-col">
         <div className="px-5 py-5 border-b border-parchment-border">
           <h1 className="font-display text-xl text-navy">PaperMind</h1>
@@ -68,7 +69,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
 
-      {/* Content — the "screen" half */}
       <main className="flex-1 overflow-auto bg-white">
         {children}
       </main>
