@@ -12,6 +12,7 @@ services:
       - postgres
       - redis
       - qdrant
+      - neo4j
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
   worker:
@@ -23,6 +24,7 @@ services:
       - postgres
       - redis
       - qdrant
+      - neo4j
     command: python -m app.workers.processor
 
   frontend:
@@ -60,7 +62,19 @@ services:
     volumes:
       - qdrant_data:/qdrant/storage
 
+  neo4j:
+    image: neo4j:5-community
+    environment:
+      NEO4J_AUTH: neo4j/papermind-neo4j
+      NEO4J_PLUGINS: '["apoc"]'
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    volumes:
+      - neo4j_data:/data
+
 volumes:
   postgres_data:
   redis_data:
   qdrant_data:
+  neo4j_data:

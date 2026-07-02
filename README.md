@@ -26,6 +26,11 @@ cp backend/.env.example backend/.env
 
 Get your free Gemini API key at: https://aistudio.google.com/apikey
 
+Optional Google OAuth setup:
+- Create OAuth credentials in Google Cloud Console.
+- Add this authorized redirect URI: `http://localhost:8000/api/v1/auth/google/callback`
+- Set `GOOGLE_OAUTH_CLIENT_ID` and `GOOGLE_OAUTH_CLIENT_SECRET` in `backend/.env`.
+
 ### 2. Start all services
 
 ```bash
@@ -49,6 +54,8 @@ Open http://localhost:8000/docs for interactive Swagger UI.
 - `POST /api/v1/auth/register` — create account
 - `POST /api/v1/auth/login` — get JWT token
 - `GET /api/v1/auth/me` — current user
+- `GET /api/v1/auth/google/start` - start Google OAuth login
+- `GET /api/v1/auth/google/callback` - Google OAuth callback
 
 ### Papers
 - `POST /api/v1/papers/upload` — upload PDF (returns immediately, processes in background)

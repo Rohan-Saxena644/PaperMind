@@ -11,6 +11,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -67,6 +68,22 @@ export default function LoginPage() {
           <button type="submit" className="btn-primary w-full" disabled={isLoading}>
             {isLoading ? 'Signing in…' : 'Sign in'}
           </button>
+
+          <div className="relative py-1">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-parchment-border" />
+            </div>
+            <div className="relative flex justify-center">
+              <span className="bg-white px-2 text-xs text-muted">or</span>
+            </div>
+          </div>
+
+          <a
+            href={`${apiUrl}/api/v1/auth/google/start`}
+            className="btn-secondary w-full text-center"
+          >
+            Continue with Google
+          </a>
 
           <p className="text-center text-sm text-muted">
             No account?{' '}

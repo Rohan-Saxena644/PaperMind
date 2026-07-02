@@ -1,7 +1,7 @@
 from qdrant_client import QdrantClient
 from qdrant_client.models import (
     Distance, VectorParams, PointStruct, Filter,
-    FieldCondition, MatchValue, SearchRequest
+    FieldCondition, FilterSelector, MatchAny, MatchValue
 )
 from app.core.config import settings
 import uuid
@@ -48,8 +48,7 @@ def search_chunks(
 
     if paper_ids:
         must_conditions.append(
-            FieldCondition(key="paper_id", match=MatchValue(value=paper_ids[0]))
-            # For multiple papers, Qdrant supports should conditions
+            FieldCondition(key="paper_id", match=MatchAny(any=paper_ids))
         )
 
     results = _client.search(
@@ -77,7 +76,9 @@ def delete_paper_chunks(paper_id: str):
     ensure_collection()
     _client.delete(
         collection_name=settings.qdrant_collection,
-        points_selector=Filter(
-            must=[FieldCondition(key="paper_id", match=MatchValue(value=paper_id))]
+        points_selector=FilterSelector(
+            filter=Filter(must=[
+                FieldCondition(key="paper_id", match=MatchValue(value=paper_id))
+            ])
         ),
     )

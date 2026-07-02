@@ -10,6 +10,7 @@ interface AuthState {
   register: (name: string, email: string, password: string) => Promise<void>
   logout: () => void
   init: () => void
+  setAuth: (token: string, user: User) => void
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
@@ -24,6 +25,10 @@ export const useAuthStore = create<AuthState>((set) => ({
     if (token && userStr) {
       set({ token, user: JSON.parse(userStr) })
     }
+  },
+
+  setAuth: (token, user) => {
+    set({ token, user })
   },
 
   login: async (email, password) => {

@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 from uuid import UUID
 from datetime import datetime
 from typing import Optional
@@ -10,7 +10,7 @@ from app.models.models import PaperStatus
 class UserRegister(BaseModel):
     email: EmailStr
     name: str
-    password: str
+    password: str = Field(min_length=8)
 
 
 class UserLogin(BaseModel):

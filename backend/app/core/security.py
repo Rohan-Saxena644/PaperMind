@@ -26,6 +26,23 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     return jwt.encode(to_encode, settings.secret_key, algorithm=ALGORITHM)
 
 
+def create_oauth_state(provider: str) -> str:
+    expire = datetime.now(timezone.utc) + timedelta(minutes=10)
+    return jwt.encode(
+        {"provider": provider, "exp": expire},
+        settings.secret_key,
+        algorithm=ALGORITHM,
+    )
+
+
+def decode_oauth_state(token: str, provider: str) -> bool:
+    try:
+        payload = jwt.decode(token, settings.secret_key, algorithms=[ALGORITHM])
+    except JWTError:
+        return False
+    return payload.get("provider") == provider
+
+
 def decode_token(token: str) -> Optional[dict]:
     try:
         return jwt.decode(token, settings.secret_key, algorithms=[ALGORITHM])
