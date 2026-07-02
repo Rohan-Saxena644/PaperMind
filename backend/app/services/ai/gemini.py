@@ -91,6 +91,47 @@ Return this exact JSON structure:
 
 
 @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
+def extract_concepts(full_text: str) -> dict:
+    prompt = f"""Extract a compact knowledge graph from this academic paper. Return ONLY valid JSON.
+
+Paper text:
+{full_text[:12000]}
+
+Return this exact JSON structure:
+{{
+  "concepts": [
+    {{"name": "concept name", "category": "method|dataset|metric|problem|theory|finding|tool|other"}}
+  ],
+  "authors": ["Author One", "Author Two"],
+  "relationships": [
+    {{"source": "concept name", "target": "related concept name", "type": "RELATED_TO"}}
+  ]
+}}
+
+Rules:
+- Return 8 to 18 important concepts.
+- Use short canonical concept names.
+- Only use concept names that appear in the concepts array as relationship endpoints.
+- Relationship type must be RELATED_TO unless the paper clearly says one concept uses or introduces another."""
+
+    response = _model.generate_content(prompt)
+    text = response.text.strip()
+
+    if text.startswith("```"):
+        text = text.split("```")[1]
+        if text.startswith("json"):
+            text = text[4:]
+    text = text.strip()
+
+    data = json.loads(text)
+    return {
+        "concepts": data.get("concepts", []),
+        "authors": data.get("authors", []),
+        "relationships": data.get("relationships", []),
+    }
+
+
+@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
 def compare_papers(papers: list[dict]) -> dict:
     """
     papers: list of {"title": str, "summary_long": str, "key_contributions": list[str]}

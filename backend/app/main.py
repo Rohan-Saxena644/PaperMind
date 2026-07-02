@@ -5,7 +5,7 @@ from sqlalchemy import inspect, text
 from app.core.config import settings
 from app.db.session import engine
 from app.models.models import Base
-from app.api.routes import auth, papers, chat, compare
+from app.api.routes import auth, papers, chat, compare, graph
 
 # Create all tables on startup
 Base.metadata.create_all(bind=engine)
@@ -56,6 +56,7 @@ app.include_router(auth.router, prefix="/api/v1")
 app.include_router(papers.router, prefix="/api/v1")
 app.include_router(chat.router, prefix="/api/v1")
 app.include_router(compare.router, prefix="/api/v1")
+app.include_router(graph.router, prefix="/api/v1")
 
 
 @app.get("/health")

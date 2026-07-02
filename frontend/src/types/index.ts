@@ -82,3 +82,41 @@ export interface QuizQuestion {
   paper_id: string
   paper_title: string
 }
+
+export interface GraphNode {
+  id: string
+  type: 'paper' | 'concept' | 'author' | string
+  label: string
+  x: number
+  y: number
+  centrality: number
+}
+
+export interface GraphEdge {
+  id: string
+  source: string
+  target: string
+  type: string
+}
+
+export interface KnowledgeGraph {
+  nodes: GraphNode[]
+  edges: GraphEdge[]
+}
+
+export interface GraphInsightConcept {
+  id: string
+  label: string
+  centrality: number
+}
+
+export interface GraphInsights {
+  node_count: number
+  edge_count: number
+  paper_count: number
+  concept_count: number
+  author_count: number
+  research_thread_count: number
+  density: number
+  top_concepts: GraphInsightConcept[]
+}

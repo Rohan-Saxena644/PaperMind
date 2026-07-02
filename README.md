@@ -10,6 +10,7 @@ Upload research papers, get AI-generated summaries, flashcards, and ask question
 | Background Worker | Redis Queue + custom worker |
 | Database | PostgreSQL (SQLAlchemy + Alembic) |
 | Vector Store | Qdrant |
+| Knowledge Graph | Neo4j + networkx |
 | AI | Gemini 2.5 Flash + text-embedding-004 |
 | PDF Processing | PyMuPDF |
 | Frontend | Next.js (coming next) |
@@ -43,6 +44,7 @@ This starts:
 - PostgreSQL at localhost:5432
 - Redis at localhost:6379
 - Qdrant at http://localhost:6333
+- Neo4j at http://localhost:7474
 
 ### 3. View API docs
 
@@ -69,6 +71,11 @@ Open http://localhost:8000/docs for interactive Swagger UI.
 - `POST /api/v1/chats/{id}/ask` — ask a question (searches all papers)
 - `GET /api/v1/chats/{id}` — get chat history
 
+### Knowledge Graph
+- `GET /api/v1/graph/knowledge-map` - graph across your full library
+- `GET /api/v1/graph/papers/{paper_id}` - graph for one paper
+- `GET /api/v1/graph/insights` - node counts, research threads, density, and top concepts
+
 ## How paper processing works
 
 ```
@@ -89,6 +96,10 @@ Gemini generates 10 flashcards
 Each chunk embedded with text-embedding-004
     ↓
 Embeddings stored in Qdrant
+    ↓
+Gemini extracts concepts and authors
+    ↓
+Paper/Concept/Author graph written to Neo4j
     ↓
 Status: ready
 ```

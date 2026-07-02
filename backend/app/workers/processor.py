@@ -12,8 +12,10 @@ from app.services.ai.gemini import (
     get_embedding,
     generate_paper_summary,
     generate_flashcards,
+    extract_concepts,
 )
 from app.services.ai.vector_store import upsert_chunk
+from app.services.ai.graph import write_paper_graph
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -92,6 +94,22 @@ def process_paper_job(paper_id: str):
             )
             db.add(db_chunk)
 
+        # 5. Extract and persist knowledge graph data. This is best effort:
+        # graph issues should not fail an otherwise usable paper ingestion.
+        try:
+            logger.info(f"Extracting graph concepts for paper {paper_id}")
+            graph_data = extract_concepts(full_text)
+            write_paper_graph(
+                user_id=str(paper.user_id),
+                paper_id=paper_id,
+                title=paper.title,
+                authors=graph_data.get("authors") or _split_authors(paper.authors),
+                concepts=graph_data.get("concepts", []),
+                relationships=graph_data.get("relationships", []),
+            )
+        except Exception as graph_error:
+            logger.warning(f"Knowledge graph write failed for paper {paper_id}: {graph_error}")
+
         paper.total_chunks = len(chunks)
         paper.status = PaperStatus.READY
         paper.processed_at = datetime.now(timezone.utc)
@@ -108,6 +126,12 @@ def process_paper_job(paper_id: str):
             db.commit()
     finally:
         db.close()
+
+
+def _split_authors(authors: str | None) -> list[str]:
+    if not authors:
+        return []
+    return [author.strip() for author in authors.replace(";", ",").split(",") if author.strip()]
 
 
 def run_worker():

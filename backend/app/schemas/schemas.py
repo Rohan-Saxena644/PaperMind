@@ -139,6 +139,44 @@ class QuizResponse(BaseModel):
 
 # ── Worker job ────────────────────────────────────────────────────────────────
 
+class GraphNode(BaseModel):
+    id: str
+    type: str
+    label: str
+    x: float = 0.5
+    y: float = 0.5
+    centrality: float = 0.0
+
+
+class GraphEdge(BaseModel):
+    id: str
+    source: str
+    target: str
+    type: str
+
+
+class GraphResponse(BaseModel):
+    nodes: list[GraphNode]
+    edges: list[GraphEdge]
+
+
+class TopConcept(BaseModel):
+    id: str
+    label: str
+    centrality: float
+
+
+class GraphInsights(BaseModel):
+    node_count: int
+    edge_count: int
+    paper_count: int
+    concept_count: int
+    author_count: int
+    research_thread_count: int
+    density: float
+    top_concepts: list[TopConcept]
+
+
 class JobStatus(BaseModel):
     job_id: str
     status: str
