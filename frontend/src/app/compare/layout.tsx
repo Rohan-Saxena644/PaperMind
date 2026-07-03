@@ -3,7 +3,7 @@
 import { useEffect } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
-import { BookOpen, MessageSquare, LayoutDashboard, LogOut, GitCompare, Brain, Network } from 'lucide-react'
+import { BookOpen, MessageSquare, LayoutDashboard, LogOut, GitCompare, Brain, Network, CalendarDays } from 'lucide-react'
 import { useAuthStore } from '@/lib/store'
 import clsx from 'clsx'
 
@@ -14,6 +14,7 @@ const navItems = [
   { href: '/compare', label: 'Compare', icon: GitCompare },
   { href: '/quiz', label: 'Quiz', icon: Brain },
   { href: '/graph', label: 'Graph', icon: Network },
+  { href: '/timeline', label: 'Timeline', icon: CalendarDays },
 ]
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {

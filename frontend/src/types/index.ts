@@ -1,4 +1,6 @@
 export type PaperStatus = 'pending' | 'processing' | 'ready' | 'failed'
+export type ReadingStatus = 'unread' | 'reading' | 'done'
+export type PaperSource = 'pdf' | 'url' | 'youtube'
 
 export interface User {
   id: string
@@ -12,9 +14,15 @@ export interface Paper {
   title: string
   authors: string | null
   abstract: string | null
+  publication_year: number | null
   file_name: string
   file_size: number
+  source_type: PaperSource
+  source_url: string | null
   status: PaperStatus
+  reading_status: ReadingStatus
+  personal_notes: string | null
+  highlights: string[] | null
   summary_short: string | null
   summary_long: string | null
   key_contributions: string[] | null
@@ -29,7 +37,11 @@ export interface PaperListItem {
   id: string
   title: string
   authors: string | null
+  publication_year: number | null
+  source_type: PaperSource
+  source_url: string | null
   status: PaperStatus
+  reading_status: ReadingStatus
   summary_short: string | null
   total_chunks: number
   created_at: string
@@ -119,4 +131,25 @@ export interface GraphInsights {
   research_thread_count: number
   density: number
   top_concepts: GraphInsightConcept[]
+}
+
+export interface TimelinePaper {
+  id: string
+  title: string
+  authors: string | null
+  summary_short: string | null
+  keywords: string[]
+  reading_status: ReadingStatus
+  publication_year: number | null
+  created_at: string
+}
+
+export interface TimelineYear {
+  year: number
+  papers: TimelinePaper[]
+  concepts: string[]
+}
+
+export interface TimelineResponse {
+  years: TimelineYear[]
 }

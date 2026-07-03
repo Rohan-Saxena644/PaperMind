@@ -1,8 +1,8 @@
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, HttpUrl
 from uuid import UUID
 from datetime import datetime
 from typing import Optional
-from app.models.models import PaperStatus
+from app.models.models import PaperSource, PaperStatus, ReadingStatus
 
 
 # ── Auth ──────────────────────────────────────────────────────────────────────
@@ -40,9 +40,15 @@ class PaperOut(BaseModel):
     title: str
     authors: Optional[str]
     abstract: Optional[str]
+    publication_year: Optional[int]
     file_name: str
     file_size: int
+    source_type: PaperSource
+    source_url: Optional[str]
     status: PaperStatus
+    reading_status: ReadingStatus
+    personal_notes: Optional[str]
+    highlights: Optional[list[str]]
     summary_short: Optional[str]
     summary_long: Optional[str]
     key_contributions: Optional[list]
@@ -59,7 +65,11 @@ class PaperListOut(BaseModel):
     id: UUID
     title: str
     authors: Optional[str]
+    publication_year: Optional[int]
+    source_type: PaperSource
+    source_url: Optional[str]
     status: PaperStatus
+    reading_status: ReadingStatus
     summary_short: Optional[str]
     total_chunks: int
     created_at: datetime
@@ -102,6 +112,16 @@ class ChatOut(BaseModel):
 class ChatAskRequest(BaseModel):
     question: str = Field(min_length=1, max_length=1000)
     paper_ids: Optional[list[UUID]] = None  # None = search all papers
+
+
+class PaperReadingUpdate(BaseModel):
+    reading_status: ReadingStatus
+    personal_notes: Optional[str] = Field(default=None, max_length=10000)
+    highlights: list[str] = Field(default_factory=list, max_length=50)
+
+
+class UrlIngestRequest(BaseModel):
+    url: HttpUrl
 
 
 # ── Compare ───────────────────────────────────────────────────────────────────
@@ -175,6 +195,29 @@ class GraphInsights(BaseModel):
     research_thread_count: int
     density: float
     top_concepts: list[TopConcept]
+
+
+class TimelinePaper(BaseModel):
+    id: UUID
+    title: str
+    authors: Optional[str]
+    summary_short: Optional[str]
+    keywords: list[str]
+    reading_status: ReadingStatus
+    publication_year: Optional[int]
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class TimelineYear(BaseModel):
+    year: int
+    papers: list[TimelinePaper]
+    concepts: list[str]
+
+
+class TimelineResponse(BaseModel):
+    years: list[TimelineYear]
 
 
 class JobStatus(BaseModel):

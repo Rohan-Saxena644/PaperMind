@@ -3,15 +3,18 @@
 import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
 import { useDropzone } from 'react-dropzone'
-import { Upload, FileText, Loader2 } from 'lucide-react'
+import { Upload, FileText, Loader2, Link as LinkIcon } from 'lucide-react'
 import { PaperListItem } from '@/types'
 import api from '@/lib/api'
 import StatusBadge from '@/components/papers/StatusBadge'
+import ReadingStatusBadge from '@/components/papers/ReadingStatusBadge'
 import { formatDistanceToNow } from 'date-fns'
 
 export default function PapersPage() {
   const [papers, setPapers] = useState<PaperListItem[]>([])
   const [uploading, setUploading] = useState(false)
+  const [ingestingUrl, setIngestingUrl] = useState(false)
+  const [sourceUrl, setSourceUrl] = useState('')
   const [uploadError, setUploadError] = useState('')
 
   const fetchPapers = () =>
@@ -56,6 +59,23 @@ export default function PapersPage() {
     disabled: uploading,
   })
 
+  const ingestUrl = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!sourceUrl.trim()) return
+
+    setIngestingUrl(true)
+    setUploadError('')
+    try {
+      await api.post('/api/v1/papers/ingest-url', { url: sourceUrl.trim() })
+      setSourceUrl('')
+      await fetchPapers()
+    } catch (err: any) {
+      setUploadError(err.response?.data?.detail || 'URL ingestion failed.')
+    } finally {
+      setIngestingUrl(false)
+    }
+  }
+
   return (
     <div className="max-w-3xl mx-auto px-8 py-10">
       <div className="flex items-center justify-between mb-6">
@@ -89,6 +109,34 @@ export default function PapersPage() {
         )}
       </div>
 
+      <form onSubmit={ingestUrl} className="border border-parchment-border rounded-xl p-4 mb-6 bg-white">
+        <div className="flex items-center gap-2 mb-3">
+          <LinkIcon size={16} className="text-accent" />
+          <div>
+            <p className="text-sm font-medium text-navy">Import from URL</p>
+            <p className="text-xs text-muted">Web articles and YouTube videos with transcripts</p>
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <input
+            className="input"
+            type="url"
+            value={sourceUrl}
+            onChange={(e) => setSourceUrl(e.target.value)}
+            placeholder="https://example.com/article"
+            disabled={ingestingUrl}
+          />
+          <button
+            type="submit"
+            disabled={ingestingUrl || !sourceUrl.trim()}
+            className="btn-primary flex items-center gap-1.5 whitespace-nowrap"
+          >
+            {ingestingUrl ? <Loader2 size={14} className="animate-spin" /> : <LinkIcon size={14} />}
+            Import
+          </button>
+        </div>
+      </form>
+
       {uploadError && (
         <div className="mb-4 bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-3 py-2">
           {uploadError}
@@ -114,6 +162,11 @@ export default function PapersPage() {
               <div className="flex items-start justify-between gap-4">
                 <div className="flex-1 min-w-0">
                   <p className="font-medium text-navy text-sm leading-snug">{paper.title}</p>
+                  {paper.source_type !== 'pdf' && (
+                    <p className="text-xs text-accent mt-0.5">
+                      {paper.source_type === 'youtube' ? 'YouTube' : 'URL'} source
+                    </p>
+                  )}
                   {paper.authors && <p className="text-xs text-muted mt-0.5">{paper.authors}</p>}
                   {paper.summary_short && paper.status === 'ready' && (
                     <p className="text-xs text-muted mt-1.5 line-clamp-2">{paper.summary_short}</p>
@@ -126,7 +179,10 @@ export default function PapersPage() {
                   )}
                 </div>
                 <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
-                  <StatusBadge status={paper.status} />
+                  <div className="flex items-center gap-1.5">
+                    <ReadingStatusBadge status={paper.reading_status} />
+                    <StatusBadge status={paper.status} />
+                  </div>
                   <span className="text-xs text-muted">
                     {formatDistanceToNow(new Date(paper.created_at), { addSuffix: true })}
                   </span>

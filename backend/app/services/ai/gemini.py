@@ -220,11 +220,12 @@ Paper text:
 
 Return this exact JSON structure:
 {{
-  "metadata": {{
-    "title": "paper title",
-    "authors": "author names or empty string",
-    "abstract": "original abstract or your summary",
-    "summary_short": "one sentence summary",
+    "metadata": {{
+      "title": "paper title",
+      "authors": "author names or empty string",
+      "abstract": "original abstract or your summary",
+      "publication_year": 2024,
+      "summary_short": "one sentence summary",
     "summary_long": "2-3 paragraph summary for a graduate student",
     "key_contributions": ["contribution 1", "contribution 2", "contribution 3"],
     "keywords": ["keyword1", "keyword2", "keyword3", "keyword4", "keyword5"]

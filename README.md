@@ -61,6 +61,7 @@ Open http://localhost:8000/docs for interactive Swagger UI.
 
 ### Papers
 - `POST /api/v1/papers/upload` — upload PDF (returns immediately, processes in background)
+- `POST /api/v1/papers/ingest-url` - import a readable webpage or YouTube video transcript
 - `GET /api/v1/papers/` — list all your papers
 - `GET /api/v1/papers/{id}` — get paper details + AI content
 - `DELETE /api/v1/papers/{id}` — delete paper + embeddings
@@ -103,6 +104,8 @@ Paper/Concept/Author graph written to Neo4j
     ↓
 Status: ready
 ```
+
+URL ingestion follows the same processing pipeline after extracting readable text. YouTube imports require a public transcript/captions track.
 
 ## Project Structure
 

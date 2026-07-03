@@ -6,8 +6,9 @@ from datetime import datetime, timezone
 
 from app.core.config import settings
 from app.db.session import SessionLocal
-from app.models.models import Paper, PaperChunk, PaperStatus
+from app.models.models import Paper, PaperChunk, PaperSource, PaperStatus
 from app.services.ingestion.pdf_processor import process_pdf
+from app.services.ingestion.text_processor import process_text_file
 from app.services.ai.gemini import (
     get_embedding,
     analyze_paper,
@@ -46,7 +47,10 @@ def process_paper_job(paper_id: str):
         db.commit()
 
         # 1. Extract text and chunk
-        full_text, chunks = process_pdf(paper.file_path)
+        if paper.source_type == PaperSource.PDF:
+            full_text, chunks = process_pdf(paper.file_path)
+        else:
+            full_text, chunks = process_text_file(paper.file_path)
 
         # 2. Analyze the paper once. This keeps free-tier usage sane by
         # combining summary, flashcards, and graph extraction into one call.
@@ -57,6 +61,7 @@ def process_paper_job(paper_id: str):
         paper.title = metadata.get("title", paper.title)
         paper.authors = metadata.get("authors", "")
         paper.abstract = metadata.get("abstract", "")
+        paper.publication_year = _safe_year(metadata.get("publication_year"))
         paper.summary_short = metadata.get("summary_short", "")
         paper.summary_long = metadata.get("summary_long", "")
         paper.key_contributions = metadata.get("key_contributions", [])
@@ -130,6 +135,15 @@ def _split_authors(authors: str | None) -> list[str]:
     if not authors:
         return []
     return [author.strip() for author in authors.replace(";", ",").split(",") if author.strip()]
+
+
+def _safe_year(value) -> int | None:
+    try:
+        year = int(value)
+    except (TypeError, ValueError):
+        return None
+    current_year = datetime.now(timezone.utc).year + 1
+    return year if 1900 <= year <= current_year else None
 
 
 def run_worker():

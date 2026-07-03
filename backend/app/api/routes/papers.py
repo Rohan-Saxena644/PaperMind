@@ -6,11 +6,12 @@ import shutil
 import os
 
 from app.db.session import get_db
-from app.models.models import User, Paper, PaperStatus
-from app.schemas.schemas import PaperOut, PaperListOut
+from app.models.models import PaperSource, User, Paper, PaperStatus
+from app.schemas.schemas import PaperOut, PaperListOut, PaperReadingUpdate, UrlIngestRequest
 from app.api.deps import get_current_user
 from app.workers.processor import enqueue_paper
 from app.core.config import settings
+from app.services.ingestion.url_processor import fetch_url_content
 
 router = APIRouter(prefix="/papers", tags=["papers"])
 
@@ -48,6 +49,7 @@ async def upload_paper(
         file_path=str(file_path),
         file_name=file.filename or "untitled.pdf",
         file_size=len(content),
+        source_type=PaperSource.PDF,
         status=PaperStatus.PENDING,
     )
     db.add(paper)
@@ -57,6 +59,44 @@ async def upload_paper(
     # Enqueue background processing
     enqueue_paper(str(paper.id))
 
+    return PaperOut.model_validate(paper)
+
+
+@router.post("/ingest-url", response_model=PaperOut, status_code=status.HTTP_202_ACCEPTED)
+def ingest_url(
+    payload: UrlIngestRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        url_content = fetch_url_content(str(payload.url))
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"Could not ingest URL: {exc}") from exc
+
+    upload_dir = Path(settings.local_storage_path) / str(current_user.id)
+    upload_dir.mkdir(parents=True, exist_ok=True)
+
+    file_id = str(uuid.uuid4())
+    file_path = upload_dir / f"{file_id}.txt"
+    encoded = url_content.text.encode("utf-8")
+    file_path.write_bytes(encoded)
+
+    source_type = PaperSource.YOUTUBE if url_content.source_type == "youtube" else PaperSource.URL
+    paper = Paper(
+        user_id=current_user.id,
+        title=url_content.title or str(payload.url),
+        file_path=str(file_path),
+        file_name=url_content.title or str(payload.url),
+        file_size=len(encoded),
+        source_type=source_type,
+        source_url=str(payload.url),
+        status=PaperStatus.PENDING,
+    )
+    db.add(paper)
+    db.commit()
+    db.refresh(paper)
+
+    enqueue_paper(str(paper.id))
     return PaperOut.model_validate(paper)
 
 
@@ -85,6 +125,32 @@ def get_paper(
     ).first()
     if not paper:
         raise HTTPException(status_code=404, detail="Paper not found")
+    return PaperOut.model_validate(paper)
+
+
+@router.patch("/{paper_id}/reading", response_model=PaperOut)
+def update_reading_progress(
+    paper_id: uuid.UUID,
+    payload: PaperReadingUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    paper = db.query(Paper).filter(
+        Paper.id == paper_id, Paper.user_id == current_user.id
+    ).first()
+    if not paper:
+        raise HTTPException(status_code=404, detail="Paper not found")
+
+    paper.reading_status = payload.reading_status
+    paper.personal_notes = payload.personal_notes.strip() if payload.personal_notes else None
+    paper.highlights = [
+        highlight.strip()
+        for highlight in payload.highlights
+        if highlight.strip()
+    ][:50]
+
+    db.commit()
+    db.refresh(paper)
     return PaperOut.model_validate(paper)
 
 

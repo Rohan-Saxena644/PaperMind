@@ -22,6 +22,18 @@ class PaperStatus(str, enum.Enum):
     FAILED = "failed"
 
 
+class ReadingStatus(str, enum.Enum):
+    UNREAD = "unread"
+    READING = "reading"
+    DONE = "done"
+
+
+class PaperSource(str, enum.Enum):
+    PDF = "pdf"
+    URL = "url"
+    YOUTUBE = "youtube"
+
+
 class User(Base):
     __tablename__ = "users"
 
@@ -47,14 +59,25 @@ class Paper(Base):
     title: Mapped[str] = mapped_column(String(500), nullable=False)
     authors: Mapped[str | None] = mapped_column(Text, nullable=True)
     abstract: Mapped[str | None] = mapped_column(Text, nullable=True)
+    publication_year: Mapped[int | None] = mapped_column(Integer, nullable=True)
     file_path: Mapped[str] = mapped_column(String(1000), nullable=False)
     file_name: Mapped[str] = mapped_column(String(500), nullable=False)
     file_size: Mapped[int] = mapped_column(Integer, nullable=False)
+    source_type: Mapped[PaperSource] = mapped_column(
+        SAEnum(PaperSource), default=PaperSource.PDF, nullable=False
+    )
+    source_url: Mapped[str | None] = mapped_column(String(1000), nullable=True)
 
     status: Mapped[PaperStatus] = mapped_column(
         SAEnum(PaperStatus), default=PaperStatus.PENDING, nullable=False
     )
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    reading_status: Mapped[ReadingStatus] = mapped_column(
+        SAEnum(ReadingStatus), default=ReadingStatus.UNREAD, nullable=False
+    )
+    personal_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    highlights: Mapped[list | None] = mapped_column(JSON, nullable=True)
 
     # AI-generated content
     summary_short: Mapped[str | None] = mapped_column(Text, nullable=True)
