@@ -124,6 +124,28 @@ class UrlIngestRequest(BaseModel):
     url: HttpUrl
 
 
+class ArxivSearchResult(BaseModel):
+    arxiv_id: str
+    title: str
+    authors: list[str]
+    summary: str
+    published_year: Optional[int]
+    pdf_url: str
+    entry_url: str
+
+
+class ArxivSearchResponse(BaseModel):
+    results: list[ArxivSearchResult]
+
+
+class ArxivImportRequest(BaseModel):
+    pdf_url: HttpUrl
+    entry_url: HttpUrl
+    title: str
+    authors: list[str] = []
+    published_year: Optional[int] = None
+
+
 # ── Compare ───────────────────────────────────────────────────────────────────
 
 class CompareRequest(BaseModel):

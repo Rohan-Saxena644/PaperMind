@@ -1,6 +1,6 @@
 export type PaperStatus = 'pending' | 'processing' | 'ready' | 'failed'
 export type ReadingStatus = 'unread' | 'reading' | 'done'
-export type PaperSource = 'pdf' | 'url' | 'youtube'
+export type PaperSource = 'pdf' | 'url' | 'youtube' | 'arxiv'
 
 export interface User {
   id: string
@@ -152,4 +152,14 @@ export interface TimelineYear {
 
 export interface TimelineResponse {
   years: TimelineYear[]
+}
+
+export interface ArxivSearchResult {
+  arxiv_id: string
+  title: string
+  authors: string[]
+  summary: string
+  published_year: number | null
+  pdf_url: string
+  entry_url: string
 }

@@ -3,8 +3,8 @@
 import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
 import { useDropzone } from 'react-dropzone'
-import { Upload, FileText, Loader2, Link as LinkIcon } from 'lucide-react'
-import { PaperListItem } from '@/types'
+import { Upload, FileText, Loader2, Link as LinkIcon, Search, Plus } from 'lucide-react'
+import { ArxivSearchResult, PaperListItem } from '@/types'
 import api from '@/lib/api'
 import StatusBadge from '@/components/papers/StatusBadge'
 import ReadingStatusBadge from '@/components/papers/ReadingStatusBadge'
@@ -15,6 +15,10 @@ export default function PapersPage() {
   const [uploading, setUploading] = useState(false)
   const [ingestingUrl, setIngestingUrl] = useState(false)
   const [sourceUrl, setSourceUrl] = useState('')
+  const [arxivQuery, setArxivQuery] = useState('')
+  const [arxivResults, setArxivResults] = useState<ArxivSearchResult[]>([])
+  const [searchingArxiv, setSearchingArxiv] = useState(false)
+  const [importingArxivId, setImportingArxivId] = useState<string | null>(null)
   const [uploadError, setUploadError] = useState('')
 
   const fetchPapers = () =>
@@ -73,6 +77,44 @@ export default function PapersPage() {
       setUploadError(err.response?.data?.detail || 'URL ingestion failed.')
     } finally {
       setIngestingUrl(false)
+    }
+  }
+
+  const searchArxiv = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (arxivQuery.trim().length < 2) return
+
+    setSearchingArxiv(true)
+    setUploadError('')
+    try {
+      const { data } = await api.get('/api/v1/papers/arxiv/search', {
+        params: { query: arxivQuery.trim(), max_results: 6 },
+      })
+      setArxivResults(data.results)
+    } catch (err: any) {
+      setUploadError(err.response?.data?.detail || 'arXiv search failed.')
+    } finally {
+      setSearchingArxiv(false)
+    }
+  }
+
+  const importArxiv = async (paper: ArxivSearchResult) => {
+    setImportingArxivId(paper.arxiv_id)
+    setUploadError('')
+    try {
+      await api.post('/api/v1/papers/arxiv/import', {
+        pdf_url: paper.pdf_url,
+        entry_url: paper.entry_url,
+        title: paper.title,
+        authors: paper.authors,
+        published_year: paper.published_year,
+      })
+      setArxivResults(prev => prev.filter(item => item.arxiv_id !== paper.arxiv_id))
+      await fetchPapers()
+    } catch (err: any) {
+      setUploadError(err.response?.data?.detail || 'arXiv import failed.')
+    } finally {
+      setImportingArxivId(null)
     }
   }
 
@@ -137,6 +179,64 @@ export default function PapersPage() {
         </div>
       </form>
 
+      <form onSubmit={searchArxiv} className="border border-parchment-border rounded-xl p-4 mb-6 bg-white">
+        <div className="flex items-center gap-2 mb-3">
+          <Search size={16} className="text-accent" />
+          <div>
+            <p className="text-sm font-medium text-navy">Search arXiv</p>
+            <p className="text-xs text-muted">Find and import papers without downloading PDFs manually</p>
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <input
+            className="input"
+            value={arxivQuery}
+            onChange={(e) => setArxivQuery(e.target.value)}
+            placeholder="transformers for time series"
+            disabled={searchingArxiv}
+          />
+          <button
+            type="submit"
+            disabled={searchingArxiv || arxivQuery.trim().length < 2}
+            className="btn-primary flex items-center gap-1.5 whitespace-nowrap"
+          >
+            {searchingArxiv ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}
+            Search
+          </button>
+        </div>
+
+        {arxivResults.length > 0 && (
+          <div className="mt-4 space-y-2">
+            {arxivResults.map(result => (
+              <div key={result.arxiv_id} className="border border-parchment-border rounded-lg p-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-navy leading-snug">{result.title}</p>
+                    <p className="text-xs text-muted mt-0.5 line-clamp-1">
+                      {result.published_year ? `${result.published_year} · ` : ''}{result.authors.join(', ')}
+                    </p>
+                    <p className="text-xs text-muted mt-2 line-clamp-2">{result.summary}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => importArxiv(result)}
+                    disabled={importingArxivId === result.arxiv_id}
+                    className="btn-secondary inline-flex items-center gap-1.5 text-xs whitespace-nowrap"
+                  >
+                    {importingArxivId === result.arxiv_id ? (
+                      <Loader2 size={13} className="animate-spin" />
+                    ) : (
+                      <Plus size={13} />
+                    )}
+                    Import
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </form>
+
       {uploadError && (
         <div className="mb-4 bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-3 py-2">
           {uploadError}
@@ -164,7 +264,7 @@ export default function PapersPage() {
                   <p className="font-medium text-navy text-sm leading-snug">{paper.title}</p>
                   {paper.source_type !== 'pdf' && (
                     <p className="text-xs text-accent mt-0.5">
-                      {paper.source_type === 'youtube' ? 'YouTube' : 'URL'} source
+                      {paper.source_type === 'youtube' ? 'YouTube' : paper.source_type === 'arxiv' ? 'arXiv' : 'URL'} source
                     </p>
                   )}
                   {paper.authors && <p className="text-xs text-muted mt-0.5">{paper.authors}</p>}

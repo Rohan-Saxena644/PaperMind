@@ -32,6 +32,7 @@ class PaperSource(str, enum.Enum):
     PDF = "pdf"
     URL = "url"
     YOUTUBE = "youtube"
+    ARXIV = "arxiv"
 
 
 class User(Base):

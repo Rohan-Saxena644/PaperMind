@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, status
 from sqlalchemy.orm import Session
 from pathlib import Path
 import uuid
@@ -7,10 +7,18 @@ import os
 
 from app.db.session import get_db
 from app.models.models import PaperSource, User, Paper, PaperStatus
-from app.schemas.schemas import PaperOut, PaperListOut, PaperReadingUpdate, UrlIngestRequest
+from app.schemas.schemas import (
+    ArxivImportRequest,
+    ArxivSearchResponse,
+    PaperOut,
+    PaperListOut,
+    PaperReadingUpdate,
+    UrlIngestRequest,
+)
 from app.api.deps import get_current_user
 from app.workers.processor import enqueue_paper
 from app.core.config import settings
+from app.services.ingestion.arxiv_processor import download_arxiv_pdf, search_arxiv
 from app.services.ingestion.url_processor import fetch_url_content
 
 router = APIRouter(prefix="/papers", tags=["papers"])
@@ -112,6 +120,57 @@ def list_papers(
         .all()
     )
     return [PaperListOut.model_validate(p) for p in papers]
+
+
+@router.get("/arxiv/search", response_model=ArxivSearchResponse)
+def search_arxiv_papers(
+    query: str = Query(min_length=2, max_length=200),
+    max_results: int = Query(default=8, ge=1, le=10),
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        results = search_arxiv(query, max_results=max_results)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"Could not search arXiv: {exc}") from exc
+    return ArxivSearchResponse(results=results)
+
+
+@router.post("/arxiv/import", response_model=PaperOut, status_code=status.HTTP_202_ACCEPTED)
+def import_arxiv_paper(
+    payload: ArxivImportRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        content = download_arxiv_pdf(str(payload.pdf_url), max_bytes=MAX_FILE_SIZE)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"Could not download arXiv PDF: {exc}") from exc
+
+    upload_dir = Path(settings.local_storage_path) / str(current_user.id)
+    upload_dir.mkdir(parents=True, exist_ok=True)
+
+    file_id = str(uuid.uuid4())
+    file_path = upload_dir / f"{file_id}.pdf"
+    file_path.write_bytes(content)
+
+    paper = Paper(
+        user_id=current_user.id,
+        title=payload.title,
+        authors=", ".join(payload.authors),
+        publication_year=payload.published_year,
+        file_path=str(file_path),
+        file_name=f"{payload.title[:180]}.pdf",
+        file_size=len(content),
+        source_type=PaperSource.ARXIV,
+        source_url=str(payload.entry_url),
+        status=PaperStatus.PENDING,
+    )
+    db.add(paper)
+    db.commit()
+    db.refresh(paper)
+
+    enqueue_paper(str(paper.id))
+    return PaperOut.model_validate(paper)
 
 
 @router.get("/{paper_id}", response_model=PaperOut)

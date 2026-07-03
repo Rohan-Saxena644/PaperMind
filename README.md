@@ -62,6 +62,8 @@ Open http://localhost:8000/docs for interactive Swagger UI.
 ### Papers
 - `POST /api/v1/papers/upload` — upload PDF (returns immediately, processes in background)
 - `POST /api/v1/papers/ingest-url` - import a readable webpage or YouTube video transcript
+- `GET /api/v1/papers/arxiv/search` - search arXiv papers
+- `POST /api/v1/papers/arxiv/import` - download an arXiv PDF and queue it for processing
 - `GET /api/v1/papers/` — list all your papers
 - `GET /api/v1/papers/{id}` — get paper details + AI content
 - `DELETE /api/v1/papers/{id}` — delete paper + embeddings
