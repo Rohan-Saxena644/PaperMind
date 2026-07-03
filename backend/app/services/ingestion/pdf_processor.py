@@ -5,8 +5,8 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-CHUNK_SIZE = 1000      # characters per chunk
-CHUNK_OVERLAP = 200    # overlap between chunks
+CHUNK_SIZE = 1800      # larger chunks reduce embedding calls
+CHUNK_OVERLAP = 250    # enough overlap to preserve local context
 
 
 def extract_text_from_pdf(file_path: str) -> tuple[str, list[dict]]:
@@ -38,13 +38,24 @@ def chunk_text(pages: list[dict]) -> list[dict]:
     chunk_index = 0
 
     for page in pages:
-        text = page["text"]
+        text = _normalize_text(page["text"])
         page_num = page["page_number"]
 
         start = 0
         while start < len(text):
-            end = start + CHUNK_SIZE
+            end = min(start + CHUNK_SIZE, len(text))
             chunk_text = text[start:end]
+
+            if end < len(text):
+                boundary = max(
+                    chunk_text.rfind("\n\n"),
+                    chunk_text.rfind(". "),
+                    chunk_text.rfind("? "),
+                    chunk_text.rfind("! "),
+                )
+                if boundary > CHUNK_SIZE * 0.55:
+                    end = start + boundary + 1
+                    chunk_text = text[start:end]
 
             if chunk_text.strip():
                 chunks.append({
@@ -54,9 +65,30 @@ def chunk_text(pages: list[dict]) -> list[dict]:
                 })
                 chunk_index += 1
 
-            start += CHUNK_SIZE - CHUNK_OVERLAP
+            if end >= len(text):
+                break
+            start = max(end - CHUNK_OVERLAP, start + 1)
 
     return chunks
+
+
+def _normalize_text(text: str) -> str:
+    lines = [line.strip() for line in text.splitlines()]
+    paragraphs = []
+    current: list[str] = []
+
+    for line in lines:
+        if not line:
+            if current:
+                paragraphs.append(" ".join(current))
+                current = []
+            continue
+        current.append(line)
+
+    if current:
+        paragraphs.append(" ".join(current))
+
+    return "\n\n".join(paragraphs)
 
 
 def process_pdf(file_path: str) -> tuple[str, list[dict]]:

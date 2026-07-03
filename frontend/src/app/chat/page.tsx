@@ -17,6 +17,7 @@ export default function ChatPage() {
   const [chats, setChats] = useState<Chat[]>([])
   const [activeChat, setActiveChat] = useState<Chat | null>(null)
   const [question, setQuestion] = useState('')
+  const [sendError, setSendError] = useState('')
   const [sending, setSending] = useState(false)
   const [creatingChat, setCreatingChat] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -63,6 +64,7 @@ export default function ChatPage() {
 
     const q = question.trim()
     setQuestion('')
+    setSendError('')
     setSending(true)
 
     // Optimistically add user message
@@ -91,11 +93,12 @@ export default function ChatPage() {
         const updated = { ...activeChat, title: q.slice(0, 40) + (q.length > 40 ? '…' : '') }
         setChats(prev => prev.map(c => c.id === activeChat.id ? updated : c))
       }
-    } catch {
+    } catch (err: any) {
       setActiveChat(prev => {
         if (!prev) return prev
         return { ...prev, messages: prev.messages.filter(m => m.id !== tempUserMsg.id) }
       })
+      setSendError(err.response?.data?.detail || 'Could not send your question.')
     } finally {
       setSending(false)
     }
@@ -226,6 +229,11 @@ export default function ChatPage() {
                 <p className="text-xs text-muted mb-2 flex items-center gap-1">
                   <BookOpen size={11} /> Searching within selected paper only
                 </p>
+              )}
+              {sendError && (
+                <div className="mb-2 bg-red-50 border border-red-200 text-red-700 text-xs rounded-lg px-3 py-2">
+                  {sendError}
+                </div>
               )}
               <div className="flex gap-2 items-end">
                 <textarea

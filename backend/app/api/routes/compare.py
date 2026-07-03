@@ -6,7 +6,7 @@ from app.db.session import get_db
 from app.models.models import User, Paper, PaperStatus
 from app.schemas.schemas import CompareRequest, CompareResponse, QuizResponse, QuizQuestion
 from app.api.deps import get_current_user
-from app.services.ai.gemini import compare_papers
+from app.services.ai.gemini import AIRateLimitError, compare_papers
 
 router = APIRouter(prefix="/papers", tags=["papers"])
 
@@ -51,7 +51,10 @@ def compare(
         for p in ordered_papers
     ]
 
-    result = compare_papers(comparison_input)
+    try:
+        result = compare_papers(comparison_input)
+    except AIRateLimitError as exc:
+        raise HTTPException(status_code=429, detail=str(exc)) from exc
     result["paper_titles"] = [p.title for p in ordered_papers]
 
     return CompareResponse(**result)

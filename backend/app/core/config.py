@@ -26,6 +26,11 @@ class Settings(BaseSettings):
     gemini_api_key: str = ""
     gemini_model: str = "gemini-2.5-flash"
     gemini_embedding_model: str = "text-embedding-004"
+    ai_rpm_limit: int = 8
+    ai_daily_limit: int = 225
+    ai_max_paper_chars: int = 14000
+    ai_max_chat_context_chars: int = 6000
+    ai_max_question_chars: int = 1000
 
     # Storage
     storage_backend: str = "local"

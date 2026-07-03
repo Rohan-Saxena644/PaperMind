@@ -6,7 +6,7 @@ from app.db.session import get_db
 from app.models.models import User, Chat, Message
 from app.schemas.schemas import ChatCreate, ChatOut, ChatAskRequest, MessageOut, MessageSource
 from app.api.deps import get_current_user
-from app.services.ai.gemini import get_query_embedding, answer_question
+from app.services.ai.gemini import AIRateLimitError, get_query_embedding, answer_question
 from app.services.ai.vector_store import search_chunks
 
 router = APIRouter(prefix="/chats", tags=["chats"])
@@ -71,33 +71,38 @@ def ask_question(
     db.add(user_msg)
     db.commit()
 
-    # 1. Embed the question
-    query_embedding = get_query_embedding(payload.question)
+    try:
+        # 1. Embed the question
+        query_embedding = get_query_embedding(payload.question)
 
-    # 2. Retrieve relevant chunks from vector store
-    paper_ids = [str(pid) for pid in payload.paper_ids] if payload.paper_ids else None
-    chunks = search_chunks(
-        query_embedding=query_embedding,
-        user_id=str(current_user.id),
-        paper_ids=paper_ids,
-        top_k=8,
-    )
+        # 2. Retrieve relevant chunks from vector store
+        paper_ids = [str(pid) for pid in payload.paper_ids] if payload.paper_ids else None
+        chunks = search_chunks(
+            query_embedding=query_embedding,
+            user_id=str(current_user.id),
+            paper_ids=paper_ids,
+            top_k=8,
+        )
 
-    if not chunks:
-        answer = "I couldn't find relevant information in your papers. Please upload some papers first."
-        sources = []
-    else:
-        # 3. Generate answer with Gemini
-        answer = answer_question(payload.question, chunks)
-        sources = [
-            {
-                "paper_id": c["paper_id"],
-                "paper_title": c["paper_title"],
-                "chunk_content": c["content"][:300],
-                "score": c["score"],
-            }
-            for c in chunks[:3]  # top 3 sources in response
-        ]
+        if not chunks:
+            answer = "I couldn't find relevant information in your papers. Please upload some papers first."
+            sources = []
+        else:
+            # 3. Generate answer with Gemini
+            answer = answer_question(payload.question, chunks)
+            sources = [
+                {
+                    "paper_id": c["paper_id"],
+                    "paper_title": c["paper_title"],
+                    "chunk_content": c["content"][:300],
+                    "score": c["score"],
+                }
+                for c in chunks[:3]  # top 3 sources in response
+            ]
+    except AIRateLimitError as exc:
+        db.delete(user_msg)
+        db.commit()
+        raise HTTPException(status_code=429, detail=str(exc)) from exc
 
     # 4. Save assistant message
     assistant_msg = Message(

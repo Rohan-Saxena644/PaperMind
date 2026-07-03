@@ -10,9 +10,7 @@ from app.models.models import Paper, PaperChunk, PaperStatus
 from app.services.ingestion.pdf_processor import process_pdf
 from app.services.ai.gemini import (
     get_embedding,
-    generate_paper_summary,
-    generate_flashcards,
-    extract_concepts,
+    analyze_paper,
 )
 from app.services.ai.vector_store import upsert_chunk
 from app.services.ai.graph import write_paper_graph
@@ -50,9 +48,11 @@ def process_paper_job(paper_id: str):
         # 1. Extract text and chunk
         full_text, chunks = process_pdf(paper.file_path)
 
-        # 2. Generate AI metadata
-        logger.info(f"Generating summary for paper {paper_id}")
-        metadata = generate_paper_summary(full_text)
+        # 2. Analyze the paper once. This keeps free-tier usage sane by
+        # combining summary, flashcards, and graph extraction into one call.
+        logger.info(f"Analyzing paper {paper_id}")
+        analysis = analyze_paper(full_text)
+        metadata = analysis.get("metadata", {})
 
         paper.title = metadata.get("title", paper.title)
         paper.authors = metadata.get("authors", "")
@@ -62,9 +62,7 @@ def process_paper_job(paper_id: str):
         paper.key_contributions = metadata.get("key_contributions", [])
         paper.keywords = metadata.get("keywords", [])
 
-        # 3. Generate flashcards
-        logger.info(f"Generating flashcards for paper {paper_id}")
-        paper.flashcards = generate_flashcards(full_text)
+        paper.flashcards = analysis.get("flashcards", [])
 
         # 4. Embed chunks and store in Qdrant + Postgres
         logger.info(f"Embedding {len(chunks)} chunks for paper {paper_id}")
@@ -97,8 +95,8 @@ def process_paper_job(paper_id: str):
         # 5. Extract and persist knowledge graph data. This is best effort:
         # graph issues should not fail an otherwise usable paper ingestion.
         try:
-            logger.info(f"Extracting graph concepts for paper {paper_id}")
-            graph_data = extract_concepts(full_text)
+            logger.info(f"Writing graph concepts for paper {paper_id}")
+            graph_data = analysis.get("graph", {})
             write_paper_graph(
                 user_id=str(paper.user_id),
                 paper_id=paper_id,
