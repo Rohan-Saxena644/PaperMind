@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 import uuid
 
 from app.db.session import get_db
-from app.models.models import User, Chat, Message
+from app.models.models import User, Chat, Message, Paper, PaperStatus
 from app.schemas.schemas import ChatCreate, ChatOut, ChatAskRequest, MessageOut, MessageSource
 from app.api.deps import get_current_user
 from app.services.ai.gemini import AIRateLimitError, get_query_embedding, answer_question
@@ -66,6 +66,22 @@ def ask_question(
     if not chat:
         raise HTTPException(status_code=404, detail="Chat not found")
 
+    if payload.paper_ids:
+        papers = (
+            db.query(Paper)
+            .filter(Paper.user_id == current_user.id, Paper.id.in_(payload.paper_ids))
+            .all()
+        )
+        if len(papers) != len(payload.paper_ids):
+            raise HTTPException(status_code=404, detail="One or more selected papers were not found")
+
+        unavailable = [paper.title for paper in papers if paper.status != PaperStatus.READY]
+        if unavailable:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Selected paper is not ready for chat yet: {', '.join(unavailable)}",
+            )
+
     # Save user message
     user_msg = Message(chat_id=chat.id, role="user", content=payload.question)
     db.add(user_msg)
@@ -103,6 +119,10 @@ def ask_question(
         db.delete(user_msg)
         db.commit()
         raise HTTPException(status_code=429, detail=str(exc)) from exc
+    except Exception as exc:
+        db.delete(user_msg)
+        db.commit()
+        raise HTTPException(status_code=500, detail=f"Could not answer question: {exc}") from exc
 
     # 4. Save assistant message
     assistant_msg = Message(

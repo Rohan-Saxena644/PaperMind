@@ -25,15 +25,15 @@ class Settings(BaseSettings):
     # Gemini
     gemini_api_key: str = ""
     gemini_model: str = "gemini-2.5-flash"
-    gemini_embedding_model: str = "text-embedding-004"
-    ai_rpm_limit: int = 8
+    gemini_embedding_model: str = "gemini-embedding-001"
+    ai_rpm_limit: int = 10
     ai_daily_limit: int = 225
     ai_max_paper_chars: int = 14000
     ai_max_chat_context_chars: int = 6000
     ai_max_question_chars: int = 1000
 
     # Worker retries
-    worker_max_retries: int = 3
+    worker_max_retries: int = 5
     worker_retry_base_seconds: int = 60
     worker_retry_max_seconds: int = 900
 

@@ -137,7 +137,7 @@ def process_paper_job(paper_id: str, job_id: str | None = None, attempt: int = 1
         logger.info(f"Paper {paper_id} processed successfully")
 
     except Exception as e:
-        logger.error(f"Failed to process paper {paper_id}: {e}")
+        logger.exception(f"Failed to process paper {paper_id}")
         _handle_job_failure(db, paper_id, job_id, attempt, e)
     finally:
         db.close()

@@ -18,6 +18,12 @@ class AIRateLimitError(RuntimeError):
     pass
 
 
+def _embedding_model_name() -> str:
+    if settings.gemini_embedding_model.startswith(("models/", "tunedModels/")):
+        return settings.gemini_embedding_model
+    return f"models/{settings.gemini_embedding_model}"
+
+
 def _redis_client():
     return redis.from_url(settings.redis_url, decode_responses=True)
 
@@ -73,6 +79,7 @@ ai_retry = retry(
     retry=retry_if_not_exception_type(AIRateLimitError),
     stop=stop_after_attempt(3),
     wait=wait_exponential(multiplier=1, min=2, max=10),
+    reraise=True,
 )
 
 
@@ -84,9 +91,10 @@ def get_embedding(text: str) -> list[float]:
 
     _consume_ai_quota("gemini")
     result = genai.embed_content(
-        model=settings.gemini_embedding_model,
+        model=_embedding_model_name(),
         content=text,
-        task_type="retrieval_document",
+        task_type="RETRIEVAL_DOCUMENT",
+        output_dimensionality=768,
     )
     embedding = result["embedding"]
     _set_cached_embedding("document", text, embedding)
@@ -101,9 +109,10 @@ def get_query_embedding(text: str) -> list[float]:
 
     _consume_ai_quota("gemini")
     result = genai.embed_content(
-        model=settings.gemini_embedding_model,
+        model=_embedding_model_name(),
         content=text,
-        task_type="retrieval_query",
+        task_type="RETRIEVAL_QUERY",
+        output_dimensionality=768,
     )
     embedding = result["embedding"]
     _set_cached_embedding("query", text, embedding)

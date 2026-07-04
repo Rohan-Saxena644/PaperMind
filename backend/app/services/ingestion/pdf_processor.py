@@ -5,8 +5,8 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-CHUNK_SIZE = 1800      # larger chunks reduce embedding calls
-CHUNK_OVERLAP = 250    # enough overlap to preserve local context
+CHUNK_SIZE = 5000      # free-tier friendly: fewer embedding calls per paper
+CHUNK_OVERLAP = 400    # enough overlap to preserve local context
 
 
 def extract_text_from_pdf(file_path: str) -> tuple[str, list[dict]]:

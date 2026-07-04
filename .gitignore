@@ -12,6 +12,9 @@ frontend/out/
 __pycache__/
 *.py[cod]
 
+# Local uploaded papers
+backend/uploads/
+
 # Local env files
 .env
 .env.*
