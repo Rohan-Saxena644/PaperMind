@@ -176,14 +176,36 @@ class CompareResponse(BaseModel):
 # ── Quiz ──────────────────────────────────────────────────────────────────────
 
 class QuizQuestion(BaseModel):
+    card_key: str
     question: str
     answer: str
     paper_id: UUID
     paper_title: str
+    due_at: datetime
+    repetitions: int = 0
+    ease_factor: float = 2.5
 
 
 class QuizResponse(BaseModel):
     questions: list[QuizQuestion]
+
+
+class QuizReviewRequest(BaseModel):
+    card_key: str = Field(min_length=64, max_length=64)
+    paper_id: UUID
+    question: str = Field(min_length=1)
+    answer: str = Field(min_length=1)
+    quality: int = Field(ge=0, le=5)
+
+
+class QuizReviewResponse(BaseModel):
+    card_key: str
+    quality: int
+    repetitions: int
+    ease_factor: float
+    interval_days: int
+    due_at: datetime
+    lapses: int
 
 
 # ── Worker job ────────────────────────────────────────────────────────────────

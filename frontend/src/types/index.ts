@@ -96,10 +96,14 @@ export interface Comparison {
 }
 
 export interface QuizQuestion {
+  card_key: string
   question: string
   answer: string
   paper_id: string
   paper_title: string
+  due_at: string
+  repetitions: number
+  ease_factor: number
 }
 
 export interface GraphNode {

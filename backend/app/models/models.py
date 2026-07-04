@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime, timezone
 from sqlalchemy import (
     String, Text, Integer, Float, Boolean,
-    DateTime, ForeignKey, Enum as SAEnum, JSON
+    DateTime, ForeignKey, Enum as SAEnum, JSON, UniqueConstraint
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import UUID
@@ -49,6 +49,9 @@ class User(Base):
 
     papers: Mapped[list["Paper"]] = relationship(back_populates="user", cascade="all, delete-orphan")
     chats: Mapped[list["Chat"]] = relationship(back_populates="user", cascade="all, delete-orphan")
+    flashcard_reviews: Mapped[list["FlashcardReview"]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
 
 
 class Paper(Base):
@@ -96,6 +99,35 @@ class Paper(Base):
 
     user: Mapped["User"] = relationship(back_populates="papers")
     chunks: Mapped[list["PaperChunk"]] = relationship(back_populates="paper", cascade="all, delete-orphan")
+    flashcard_reviews: Mapped[list["FlashcardReview"]] = relationship(
+        back_populates="paper", cascade="all, delete-orphan"
+    )
+
+
+class FlashcardReview(Base):
+    __tablename__ = "flashcard_reviews"
+    __table_args__ = (
+        UniqueConstraint("user_id", "card_key", name="uq_flashcard_reviews_user_card"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
+    paper_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("papers.id"), nullable=False, index=True)
+
+    card_key: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    question: Mapped[str] = mapped_column(Text, nullable=False)
+    answer: Mapped[str] = mapped_column(Text, nullable=False)
+    paper_title: Mapped[str] = mapped_column(String(500), nullable=False)
+
+    repetitions: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    ease_factor: Mapped[float] = mapped_column(Float, default=2.5, nullable=False)
+    interval_days: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    lapses: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    due_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False, index=True)
+    last_reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    user: Mapped["User"] = relationship(back_populates="flashcard_reviews")
+    paper: Mapped["Paper"] = relationship(back_populates="flashcard_reviews")
 
 
 class PaperChunk(Base):
