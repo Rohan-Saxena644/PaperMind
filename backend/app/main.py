@@ -49,6 +49,12 @@ def ensure_lightweight_schema_updates():
         paper_updates.append("ALTER TABLE papers ADD COLUMN source_type VARCHAR(20) NOT NULL DEFAULT 'PDF'")
     if "source_url" not in paper_columns:
         paper_updates.append("ALTER TABLE papers ADD COLUMN source_url VARCHAR(1000)")
+    if "processing_attempts" not in paper_columns:
+        paper_updates.append("ALTER TABLE papers ADD COLUMN processing_attempts INTEGER NOT NULL DEFAULT 0")
+    if "next_retry_at" not in paper_columns:
+        paper_updates.append("ALTER TABLE papers ADD COLUMN next_retry_at TIMESTAMP WITH TIME ZONE")
+    if "failed_at" not in paper_columns:
+        paper_updates.append("ALTER TABLE papers ADD COLUMN failed_at TIMESTAMP WITH TIME ZONE")
 
     if paper_updates:
         with engine.begin() as connection:

@@ -32,6 +32,11 @@ class Settings(BaseSettings):
     ai_max_chat_context_chars: int = 6000
     ai_max_question_chars: int = 1000
 
+    # Worker retries
+    worker_max_retries: int = 3
+    worker_retry_base_seconds: int = 60
+    worker_retry_max_seconds: int = 900
+
     # Storage
     storage_backend: str = "local"
     local_storage_path: str = "/app/uploads"

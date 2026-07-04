@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Trash2, MessageSquare, BookOpen, Lightbulb, Tag, Save, Highlighter, ExternalLink } from 'lucide-react'
+import { ArrowLeft, Trash2, MessageSquare, BookOpen, Lightbulb, Tag, Save, Highlighter, ExternalLink, RotateCcw } from 'lucide-react'
 import { Paper, ReadingStatus } from '@/types'
 import api from '@/lib/api'
 import StatusBadge from '@/components/papers/StatusBadge'
@@ -16,6 +16,7 @@ export default function PaperDetailPage() {
   const [loading, setLoading] = useState(true)
   const [activeFlashcard, setActiveFlashcard] = useState<number | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [retrying, setRetrying] = useState(false)
   const [readingStatus, setReadingStatus] = useState<ReadingStatus>('unread')
   const [personalNotes, setPersonalNotes] = useState('')
   const [highlightsText, setHighlightsText] = useState('')
@@ -41,6 +42,17 @@ export default function PaperDetailPage() {
       await api.delete(`/api/v1/papers/${id}`)
       router.push('/papers')
     } catch { setDeleting(false) }
+  }
+
+  const retryProcessing = async () => {
+    if (!paper) return
+    setRetrying(true)
+    try {
+      const { data } = await api.post(`/api/v1/papers/${paper.id}/retry`)
+      setPaper(data)
+    } finally {
+      setRetrying(false)
+    }
   }
 
   const saveReadingProgress = async () => {
@@ -105,12 +117,29 @@ export default function PaperDetailPage() {
           <Link href={`/chat?paper=${paper.id}`} className="btn-primary flex items-center gap-1.5 text-xs">
             <MessageSquare size={13} /> Ask AI
           </Link>
+          {paper.status === 'failed' && (
+            <button
+              onClick={retryProcessing}
+              disabled={retrying}
+              className="btn-secondary inline-flex items-center gap-1.5 text-xs"
+            >
+              <RotateCcw size={13} />
+              {retrying ? 'Retrying...' : 'Retry'}
+            </button>
+          )}
           <button onClick={handleDelete} disabled={deleting}
             className="p-2 text-muted hover:text-red-500 transition-colors rounded-lg hover:bg-red-50">
             <Trash2 size={15} />
           </button>
         </div>
       </div>
+
+      {paper.status === 'failed' && paper.error_message && (
+        <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl px-4 py-3 mb-6">
+          <p className="font-medium mb-1">Processing failed after {paper.processing_attempts} attempt{paper.processing_attempts !== 1 ? 's' : ''}</p>
+          <p>{paper.error_message}</p>
+        </div>
+      )}
 
       {/* Keywords */}
       {paper.keywords && paper.keywords.length > 0 && (

@@ -20,6 +20,10 @@ export interface Paper {
   source_type: PaperSource
   source_url: string | null
   status: PaperStatus
+  error_message: string | null
+  processing_attempts: number
+  next_retry_at: string | null
+  failed_at: string | null
   reading_status: ReadingStatus
   personal_notes: string | null
   highlights: string[] | null
@@ -41,6 +45,9 @@ export interface PaperListItem {
   source_type: PaperSource
   source_url: string | null
   status: PaperStatus
+  error_message: string | null
+  processing_attempts: number
+  next_retry_at: string | null
   reading_status: ReadingStatus
   summary_short: string | null
   total_chunks: number

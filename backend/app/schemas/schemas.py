@@ -46,6 +46,10 @@ class PaperOut(BaseModel):
     source_type: PaperSource
     source_url: Optional[str]
     status: PaperStatus
+    error_message: Optional[str]
+    processing_attempts: int
+    next_retry_at: Optional[datetime]
+    failed_at: Optional[datetime]
     reading_status: ReadingStatus
     personal_notes: Optional[str]
     highlights: Optional[list[str]]
@@ -69,6 +73,9 @@ class PaperListOut(BaseModel):
     source_type: PaperSource
     source_url: Optional[str]
     status: PaperStatus
+    error_message: Optional[str]
+    processing_attempts: int
+    next_retry_at: Optional[datetime]
     reading_status: ReadingStatus
     summary_short: Optional[str]
     total_chunks: int

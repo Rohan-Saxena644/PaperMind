@@ -2,7 +2,8 @@ import redis
 import json
 import uuid
 import logging
-from datetime import datetime, timezone
+import time
+from datetime import datetime, timedelta, timezone
 
 from app.core.config import settings
 from app.db.session import SessionLocal
@@ -13,29 +14,36 @@ from app.services.ai.gemini import (
     get_embedding,
     analyze_paper,
 )
-from app.services.ai.vector_store import upsert_chunk
+from app.services.ai.vector_store import delete_paper_chunks, upsert_chunk
 from app.services.ai.graph import write_paper_graph
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
 QUEUE_NAME = "paper_processing"
+RETRY_QUEUE_NAME = "paper_processing_retry"
+DEAD_LETTER_QUEUE_NAME = "paper_processing_dead_letter"
 
 
 def get_redis():
     return redis.from_url(settings.redis_url)
 
 
-def enqueue_paper(paper_id: str) -> str:
+def enqueue_paper(paper_id: str, attempt: int = 1) -> str:
     r = get_redis()
     job_id = str(uuid.uuid4())
-    payload = json.dumps({"job_id": job_id, "paper_id": paper_id})
+    payload = json.dumps({
+        "job_id": job_id,
+        "paper_id": paper_id,
+        "attempt": attempt,
+        "enqueued_at": datetime.now(timezone.utc).isoformat(),
+    })
     r.rpush(QUEUE_NAME, payload)
-    logger.info(f"Enqueued paper {paper_id} as job {job_id}")
+    logger.info(f"Enqueued paper {paper_id} as job {job_id}, attempt {attempt}")
     return job_id
 
 
-def process_paper_job(paper_id: str):
+def process_paper_job(paper_id: str, job_id: str | None = None, attempt: int = 1):
     db = SessionLocal()
     try:
         paper = db.get(Paper, uuid.UUID(paper_id))
@@ -44,10 +52,16 @@ def process_paper_job(paper_id: str):
             return
 
         paper.status = PaperStatus.PROCESSING
+        paper.processing_attempts = attempt
+        paper.error_message = None
+        paper.next_retry_at = None
+        paper.failed_at = None
         db.commit()
 
+        _clear_existing_outputs(db, paper)
+
         # 1. Extract text and chunk
-        if paper.source_type == PaperSource.PDF:
+        if paper.source_type == PaperSource.PDF or paper.source_type == PaperSource.ARXIV:
             full_text, chunks = process_pdf(paper.file_path)
         else:
             full_text, chunks = process_text_file(paper.file_path)
@@ -59,9 +73,9 @@ def process_paper_job(paper_id: str):
         metadata = analysis.get("metadata", {})
 
         paper.title = metadata.get("title", paper.title)
-        paper.authors = metadata.get("authors", "")
+        paper.authors = metadata.get("authors", paper.authors or "")
         paper.abstract = metadata.get("abstract", "")
-        paper.publication_year = _safe_year(metadata.get("publication_year"))
+        paper.publication_year = _safe_year(metadata.get("publication_year")) or paper.publication_year
         paper.summary_short = metadata.get("summary_short", "")
         paper.summary_long = metadata.get("summary_long", "")
         paper.key_contributions = metadata.get("key_contributions", [])
@@ -116,19 +130,56 @@ def process_paper_job(paper_id: str):
         paper.total_chunks = len(chunks)
         paper.status = PaperStatus.READY
         paper.processed_at = datetime.now(timezone.utc)
+        paper.next_retry_at = None
+        paper.failed_at = None
         db.commit()
 
         logger.info(f"Paper {paper_id} processed successfully")
 
     except Exception as e:
         logger.error(f"Failed to process paper {paper_id}: {e}")
-        paper = db.get(Paper, uuid.UUID(paper_id))
-        if paper:
-            paper.status = PaperStatus.FAILED
-            paper.error_message = str(e)
-            db.commit()
+        _handle_job_failure(db, paper_id, job_id, attempt, e)
     finally:
         db.close()
+
+
+def _clear_existing_outputs(db, paper: Paper) -> None:
+    for chunk in list(paper.chunks):
+        db.delete(chunk)
+    db.flush()
+
+    try:
+        delete_paper_chunks(str(paper.id))
+    except Exception as exc:
+        logger.warning(f"Could not clear old vectors for paper {paper.id}: {exc}")
+
+
+def _handle_job_failure(db, paper_id: str, job_id: str | None, attempt: int, error: Exception) -> None:
+    paper = db.get(Paper, uuid.UUID(paper_id))
+    if not paper:
+        return
+
+    paper.processing_attempts = attempt
+    paper.error_message = str(error)
+
+    if attempt < settings.worker_max_retries:
+        delay = min(
+            settings.worker_retry_base_seconds * (2 ** max(attempt - 1, 0)),
+            settings.worker_retry_max_seconds,
+        )
+        retry_at = datetime.now(timezone.utc) + timedelta(seconds=delay)
+        paper.status = PaperStatus.PENDING
+        paper.next_retry_at = retry_at
+        db.commit()
+        _schedule_retry(paper_id, attempt + 1, retry_at)
+        logger.info(f"Scheduled retry for paper {paper_id} in {delay}s")
+        return
+
+    paper.status = PaperStatus.FAILED
+    paper.failed_at = datetime.now(timezone.utc)
+    paper.next_retry_at = None
+    db.commit()
+    _dead_letter(paper_id, job_id, attempt, error)
 
 
 def _split_authors(authors: str | None) -> list[str]:
@@ -146,20 +197,59 @@ def _safe_year(value) -> int | None:
     return year if 1900 <= year <= current_year else None
 
 
+def _schedule_retry(paper_id: str, attempt: int, retry_at: datetime) -> None:
+    payload = json.dumps({
+        "job_id": str(uuid.uuid4()),
+        "paper_id": paper_id,
+        "attempt": attempt,
+        "enqueued_at": datetime.now(timezone.utc).isoformat(),
+    })
+    get_redis().zadd(RETRY_QUEUE_NAME, {payload: retry_at.timestamp()})
+
+
+def _dead_letter(paper_id: str, job_id: str | None, attempt: int, error: Exception) -> None:
+    payload = json.dumps({
+        "job_id": job_id,
+        "paper_id": paper_id,
+        "attempt": attempt,
+        "failed_at": datetime.now(timezone.utc).isoformat(),
+        "error": str(error),
+    })
+    get_redis().rpush(DEAD_LETTER_QUEUE_NAME, payload)
+
+
+def _release_due_retries(r) -> int:
+    due = r.zrangebyscore(RETRY_QUEUE_NAME, min=0, max=time.time())
+    if not due:
+        return 0
+
+    released = 0
+    for payload in due:
+        if r.zrem(RETRY_QUEUE_NAME, payload):
+            r.rpush(QUEUE_NAME, payload)
+            released += 1
+    return released
+
+
 def run_worker():
     r = get_redis()
     logger.info(f"Worker started, listening on queue: {QUEUE_NAME}")
 
     while True:
         # Blocking pop — waits up to 5s then loops
+        released = _release_due_retries(r)
+        if released:
+            logger.info(f"Released {released} retry job(s)")
+
         result = r.blpop(QUEUE_NAME, timeout=5)
         if result:
             _, payload_bytes = result
             payload = json.loads(payload_bytes)
             paper_id = payload["paper_id"]
             job_id = payload["job_id"]
-            logger.info(f"Processing job {job_id} for paper {paper_id}")
-            process_paper_job(paper_id)
+            attempt = int(payload.get("attempt", 1))
+            logger.info(f"Processing job {job_id} for paper {paper_id}, attempt {attempt}")
+            process_paper_job(paper_id, job_id=job_id, attempt=attempt)
 
 
 if __name__ == "__main__":

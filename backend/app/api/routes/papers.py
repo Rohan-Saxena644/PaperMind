@@ -213,6 +213,32 @@ def update_reading_progress(
     return PaperOut.model_validate(paper)
 
 
+@router.post("/{paper_id}/retry", response_model=PaperOut, status_code=status.HTTP_202_ACCEPTED)
+def retry_paper_processing(
+    paper_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    paper = db.query(Paper).filter(
+        Paper.id == paper_id, Paper.user_id == current_user.id
+    ).first()
+    if not paper:
+        raise HTTPException(status_code=404, detail="Paper not found")
+    if paper.status not in {PaperStatus.FAILED, PaperStatus.PENDING}:
+        raise HTTPException(status_code=400, detail="Only failed or queued papers can be retried")
+
+    paper.status = PaperStatus.PENDING
+    paper.error_message = None
+    paper.processing_attempts = 0
+    paper.next_retry_at = None
+    paper.failed_at = None
+    db.commit()
+    db.refresh(paper)
+
+    enqueue_paper(str(paper.id), attempt=1)
+    return PaperOut.model_validate(paper)
+
+
 @router.delete("/{paper_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_paper(
     paper_id: uuid.UUID,

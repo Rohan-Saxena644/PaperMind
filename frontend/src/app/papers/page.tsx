@@ -254,9 +254,11 @@ export default function PapersPage() {
           {papers.map(paper => (
             <Link
               key={paper.id}
-              href={paper.status === 'ready' ? `/papers/${paper.id}` : '#'}
+              href={paper.status === 'ready' || paper.status === 'failed' ? `/papers/${paper.id}` : '#'}
               className={`block border border-parchment-border rounded-xl p-4 transition-shadow ${
-                paper.status === 'ready' ? 'hover:shadow-paper cursor-pointer' : 'cursor-default opacity-80'
+                paper.status === 'ready' || paper.status === 'failed'
+                  ? 'hover:shadow-paper cursor-pointer'
+                  : 'cursor-default opacity-80'
               }`}
             >
               <div className="flex items-start justify-between gap-4">
@@ -274,7 +276,12 @@ export default function PapersPage() {
                   {(paper.status === 'pending' || paper.status === 'processing') && (
                     <p className="text-xs text-amber-600 mt-1.5 flex items-center gap-1">
                       <Loader2 size={11} className="animate-spin" />
-                      AI is processing your paper…
+                      {paper.next_retry_at ? 'Retry scheduled…' : 'AI is processing your paper…'}
+                    </p>
+                  )}
+                  {paper.status === 'failed' && paper.error_message && (
+                    <p className="text-xs text-red-600 mt-1.5 line-clamp-2">
+                      {paper.error_message}
                     </p>
                   )}
                 </div>

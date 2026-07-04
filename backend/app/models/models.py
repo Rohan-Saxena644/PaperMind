@@ -73,6 +73,9 @@ class Paper(Base):
         SAEnum(PaperStatus), default=PaperStatus.PENDING, nullable=False
     )
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    processing_attempts: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    next_retry_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    failed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     reading_status: Mapped[ReadingStatus] = mapped_column(
         SAEnum(ReadingStatus), default=ReadingStatus.UNREAD, nullable=False
