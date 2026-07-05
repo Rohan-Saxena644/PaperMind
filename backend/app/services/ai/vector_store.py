@@ -37,6 +37,7 @@ def upsert_chunk(chunk_id: str, embedding: list[float], payload: dict) -> str:
 def search_chunks(
     query_embedding: list[float],
     user_id: str,
+    workspace_id: str | None = None,
     paper_ids: list[str] | None = None,
     top_k: int = 8,
 ) -> list[dict]:
@@ -45,6 +46,10 @@ def search_chunks(
     must_conditions = [
         FieldCondition(key="user_id", match=MatchValue(value=user_id))
     ]
+    if workspace_id:
+        must_conditions.append(
+            FieldCondition(key="workspace_id", match=MatchValue(value=workspace_id))
+        )
 
     if paper_ids:
         must_conditions.append(

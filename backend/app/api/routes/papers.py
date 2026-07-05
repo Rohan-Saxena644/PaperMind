@@ -6,7 +6,7 @@ import shutil
 import os
 
 from app.db.session import get_db
-from app.models.models import PaperSource, User, Paper, PaperStatus
+from app.models.models import PaperSource, User, Paper, PaperStatus, Workspace
 from app.schemas.schemas import (
     ArxivImportRequest,
     ArxivSearchResponse,
@@ -15,7 +15,7 @@ from app.schemas.schemas import (
     PaperReadingUpdate,
     UrlIngestRequest,
 )
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, get_current_workspace
 from app.workers.processor import enqueue_paper
 from app.core.config import settings
 from app.services.ingestion.arxiv_processor import download_arxiv_pdf, search_arxiv
@@ -32,6 +32,7 @@ async def upload_paper(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    workspace: Workspace = Depends(get_current_workspace),
 ):
     if file.content_type not in ALLOWED_TYPES:
         raise HTTPException(status_code=400, detail="Only PDF files are supported")
@@ -53,6 +54,7 @@ async def upload_paper(
     # Create DB record
     paper = Paper(
         user_id=current_user.id,
+        workspace_id=workspace.id,
         title=file.filename or "Untitled",
         file_path=str(file_path),
         file_name=file.filename or "untitled.pdf",
@@ -75,6 +77,7 @@ def ingest_url(
     payload: UrlIngestRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    workspace: Workspace = Depends(get_current_workspace),
 ):
     try:
         url_content = fetch_url_content(str(payload.url))
@@ -92,6 +95,7 @@ def ingest_url(
     source_type = PaperSource.YOUTUBE if url_content.source_type == "youtube" else PaperSource.URL
     paper = Paper(
         user_id=current_user.id,
+        workspace_id=workspace.id,
         title=url_content.title or str(payload.url),
         file_path=str(file_path),
         file_name=url_content.title or str(payload.url),
@@ -112,10 +116,11 @@ def ingest_url(
 def list_papers(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    workspace: Workspace = Depends(get_current_workspace),
 ):
     papers = (
         db.query(Paper)
-        .filter(Paper.user_id == current_user.id)
+        .filter(Paper.user_id == current_user.id, Paper.workspace_id == workspace.id)
         .order_by(Paper.created_at.desc())
         .all()
     )
@@ -140,6 +145,7 @@ def import_arxiv_paper(
     payload: ArxivImportRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    workspace: Workspace = Depends(get_current_workspace),
 ):
     try:
         content = download_arxiv_pdf(str(payload.pdf_url), max_bytes=MAX_FILE_SIZE)
@@ -155,6 +161,7 @@ def import_arxiv_paper(
 
     paper = Paper(
         user_id=current_user.id,
+        workspace_id=workspace.id,
         title=payload.title,
         authors=", ".join(payload.authors),
         publication_year=payload.published_year,

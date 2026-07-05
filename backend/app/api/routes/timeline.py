@@ -3,9 +3,9 @@ from collections import Counter, defaultdict
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, get_current_workspace
 from app.db.session import get_db
-from app.models.models import Paper, PaperStatus, User
+from app.models.models import Paper, PaperStatus, User, Workspace
 from app.schemas.schemas import TimelinePaper, TimelineResponse, TimelineYear
 
 router = APIRouter(prefix="/timeline", tags=["timeline"])
@@ -15,10 +15,15 @@ router = APIRouter(prefix="/timeline", tags=["timeline"])
 def paper_timeline(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    workspace: Workspace = Depends(get_current_workspace),
 ):
     papers = (
         db.query(Paper)
-        .filter(Paper.user_id == current_user.id, Paper.status == PaperStatus.READY)
+        .filter(
+            Paper.user_id == current_user.id,
+            Paper.workspace_id == workspace.id,
+            Paper.status == PaperStatus.READY,
+        )
         .order_by(Paper.created_at.asc())
         .all()
     )

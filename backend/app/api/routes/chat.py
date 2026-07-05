@@ -3,9 +3,9 @@ from sqlalchemy.orm import Session
 import uuid
 
 from app.db.session import get_db
-from app.models.models import User, Chat, Message, Paper, PaperStatus
+from app.models.models import User, Chat, Message, Paper, PaperStatus, Workspace
 from app.schemas.schemas import ChatCreate, ChatOut, ChatAskRequest, MessageOut, MessageSource
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, get_current_workspace
 from app.services.ai.gemini import AIRateLimitError, get_query_embedding, answer_question
 from app.services.ai.vector_store import search_chunks
 
@@ -17,8 +17,9 @@ def create_chat(
     payload: ChatCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    workspace: Workspace = Depends(get_current_workspace),
 ):
-    chat = Chat(user_id=current_user.id, title=payload.title)
+    chat = Chat(user_id=current_user.id, workspace_id=workspace.id, title=payload.title)
     db.add(chat)
     db.commit()
     db.refresh(chat)
@@ -29,10 +30,11 @@ def create_chat(
 def list_chats(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    workspace: Workspace = Depends(get_current_workspace),
 ):
     chats = (
         db.query(Chat)
-        .filter(Chat.user_id == current_user.id)
+        .filter(Chat.user_id == current_user.id, Chat.workspace_id == workspace.id)
         .order_by(Chat.created_at.desc())
         .all()
     )
@@ -44,9 +46,10 @@ def get_chat(
     chat_id: uuid.UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    workspace: Workspace = Depends(get_current_workspace),
 ):
     chat = db.query(Chat).filter(
-        Chat.id == chat_id, Chat.user_id == current_user.id
+        Chat.id == chat_id, Chat.user_id == current_user.id, Chat.workspace_id == workspace.id
     ).first()
     if not chat:
         raise HTTPException(status_code=404, detail="Chat not found")
@@ -59,9 +62,10 @@ def ask_question(
     payload: ChatAskRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    workspace: Workspace = Depends(get_current_workspace),
 ):
     chat = db.query(Chat).filter(
-        Chat.id == chat_id, Chat.user_id == current_user.id
+        Chat.id == chat_id, Chat.user_id == current_user.id, Chat.workspace_id == workspace.id
     ).first()
     if not chat:
         raise HTTPException(status_code=404, detail="Chat not found")
@@ -69,7 +73,11 @@ def ask_question(
     if payload.paper_ids:
         papers = (
             db.query(Paper)
-            .filter(Paper.user_id == current_user.id, Paper.id.in_(payload.paper_ids))
+            .filter(
+                Paper.user_id == current_user.id,
+                Paper.workspace_id == workspace.id,
+                Paper.id.in_(payload.paper_ids),
+            )
             .all()
         )
         if len(papers) != len(payload.paper_ids):
@@ -96,6 +104,7 @@ def ask_question(
         chunks = search_chunks(
             query_embedding=query_embedding,
             user_id=str(current_user.id),
+            workspace_id=str(workspace.id),
             paper_ids=paper_ids,
             top_k=8,
         )
@@ -143,9 +152,10 @@ def delete_chat(
     chat_id: uuid.UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    workspace: Workspace = Depends(get_current_workspace),
 ):
     chat = db.query(Chat).filter(
-        Chat.id == chat_id, Chat.user_id == current_user.id
+        Chat.id == chat_id, Chat.user_id == current_user.id, Chat.workspace_id == workspace.id
     ).first()
     if not chat:
         raise HTTPException(status_code=404, detail="Chat not found")

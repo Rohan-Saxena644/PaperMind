@@ -96,6 +96,7 @@ def process_paper_job(paper_id: str, job_id: str | None = None, attempt: int = 1
                     "paper_id": paper_id,
                     "paper_title": paper.title,
                     "user_id": str(paper.user_id),
+                    "workspace_id": str(paper.workspace_id),
                     "content": chunk_data["content"],
                     "page_number": chunk_data["page_number"],
                     "chunk_index": chunk_data["chunk_index"],
@@ -118,6 +119,7 @@ def process_paper_job(paper_id: str, job_id: str | None = None, attempt: int = 1
             graph_data = analysis.get("graph", {})
             write_paper_graph(
                 user_id=str(paper.user_id),
+                workspace_id=str(paper.workspace_id),
                 paper_id=paper_id,
                 title=paper.title,
                 authors=graph_data.get("authors") or _split_authors(paper.authors),

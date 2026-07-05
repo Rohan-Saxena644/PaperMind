@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 
-from app.api.deps import get_current_user
-from app.models.models import User
+from app.api.deps import get_current_user, get_current_workspace
+from app.models.models import User, Workspace
 from app.schemas.schemas import GraphInsights, GraphResponse
 from app.services.ai.graph import get_knowledge_map, get_paper_graph
 from app.services.ai.graph_layout import graph_summary, layout_graph
@@ -10,9 +10,12 @@ router = APIRouter(prefix="/graph", tags=["graph"])
 
 
 @router.get("/knowledge-map", response_model=GraphResponse)
-def knowledge_map(current_user: User = Depends(get_current_user)):
+def knowledge_map(
+    current_user: User = Depends(get_current_user),
+    workspace: Workspace = Depends(get_current_workspace),
+):
     try:
-        graph = get_knowledge_map(str(current_user.id))
+        graph = get_knowledge_map(str(current_user.id), str(workspace.id))
     except Exception as exc:
         raise HTTPException(status_code=503, detail=f"Knowledge graph unavailable: {exc}") from exc
 
@@ -20,9 +23,13 @@ def knowledge_map(current_user: User = Depends(get_current_user)):
 
 
 @router.get("/papers/{paper_id}", response_model=GraphResponse)
-def paper_graph(paper_id: str, current_user: User = Depends(get_current_user)):
+def paper_graph(
+    paper_id: str,
+    current_user: User = Depends(get_current_user),
+    workspace: Workspace = Depends(get_current_workspace),
+):
     try:
-        graph = get_paper_graph(str(current_user.id), paper_id)
+        graph = get_paper_graph(str(current_user.id), str(workspace.id), paper_id)
     except Exception as exc:
         raise HTTPException(status_code=503, detail=f"Knowledge graph unavailable: {exc}") from exc
 
@@ -33,9 +40,12 @@ def paper_graph(paper_id: str, current_user: User = Depends(get_current_user)):
 
 
 @router.get("/insights", response_model=GraphInsights)
-def graph_insights(current_user: User = Depends(get_current_user)):
+def graph_insights(
+    current_user: User = Depends(get_current_user),
+    workspace: Workspace = Depends(get_current_workspace),
+):
     try:
-        graph = get_knowledge_map(str(current_user.id))
+        graph = get_knowledge_map(str(current_user.id), str(workspace.id))
     except Exception as exc:
         raise HTTPException(status_code=503, detail=f"Knowledge graph unavailable: {exc}") from exc
 

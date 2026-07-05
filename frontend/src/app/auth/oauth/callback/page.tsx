@@ -21,6 +21,7 @@ export default function OAuthCallbackPage() {
     const finishLogin = async () => {
       try {
         localStorage.setItem('pm_token', token)
+        localStorage.removeItem('pm_workspace_id')
         const { data: user } = await api.get('/api/v1/auth/me')
         localStorage.setItem('pm_user', JSON.stringify(user))
         setAuth(token, user)
@@ -28,6 +29,7 @@ export default function OAuthCallbackPage() {
       } catch {
         localStorage.removeItem('pm_token')
         localStorage.removeItem('pm_user')
+        localStorage.removeItem('pm_workspace_id')
         setError('Could not finish OAuth login. Please try again.')
       }
     }

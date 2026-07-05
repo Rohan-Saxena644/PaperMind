@@ -47,10 +47,29 @@ class User(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
+    workspaces: Mapped[list["Workspace"]] = relationship(back_populates="user", cascade="all, delete-orphan")
     papers: Mapped[list["Paper"]] = relationship(back_populates="user", cascade="all, delete-orphan")
     chats: Mapped[list["Chat"]] = relationship(back_populates="user", cascade="all, delete-orphan")
     flashcard_reviews: Mapped[list["FlashcardReview"]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
+    )
+
+
+class Workspace(Base):
+    __tablename__ = "workspaces"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    is_default: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    user: Mapped["User"] = relationship(back_populates="workspaces")
+    papers: Mapped[list["Paper"]] = relationship(back_populates="workspace", cascade="all, delete-orphan")
+    chats: Mapped[list["Chat"]] = relationship(back_populates="workspace", cascade="all, delete-orphan")
+    flashcard_reviews: Mapped[list["FlashcardReview"]] = relationship(
+        back_populates="workspace", cascade="all, delete-orphan"
     )
 
 
@@ -59,6 +78,9 @@ class Paper(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    workspace_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("workspaces.id"), nullable=True, index=True
+    )
 
     title: Mapped[str] = mapped_column(String(500), nullable=False)
     authors: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -98,6 +120,7 @@ class Paper(Base):
     processed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     user: Mapped["User"] = relationship(back_populates="papers")
+    workspace: Mapped["Workspace"] = relationship(back_populates="papers")
     chunks: Mapped[list["PaperChunk"]] = relationship(back_populates="paper", cascade="all, delete-orphan")
     flashcard_reviews: Mapped[list["FlashcardReview"]] = relationship(
         back_populates="paper", cascade="all, delete-orphan"
@@ -112,6 +135,9 @@ class FlashcardReview(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
+    workspace_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("workspaces.id"), nullable=True, index=True
+    )
     paper_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("papers.id"), nullable=False, index=True)
 
     card_key: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
@@ -127,6 +153,7 @@ class FlashcardReview(Base):
     last_reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     user: Mapped["User"] = relationship(back_populates="flashcard_reviews")
+    workspace: Mapped["Workspace"] = relationship(back_populates="flashcard_reviews")
     paper: Mapped["Paper"] = relationship(back_populates="flashcard_reviews")
 
 
@@ -149,11 +176,15 @@ class Chat(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    workspace_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("workspaces.id"), nullable=True, index=True
+    )
 
     title: Mapped[str] = mapped_column(String(500), default="New Chat")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     user: Mapped["User"] = relationship(back_populates="chats")
+    workspace: Mapped["Workspace"] = relationship(back_populates="chats")
     messages: Mapped[list["Message"]] = relationship(back_populates="chat", cascade="all, delete-orphan")
 
 

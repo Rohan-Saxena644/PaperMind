@@ -9,8 +9,17 @@ export interface User {
   created_at: string
 }
 
+export interface Workspace {
+  id: string
+  name: string
+  description: string | null
+  is_default: boolean
+  created_at: string
+}
+
 export interface Paper {
   id: string
+  workspace_id: string | null
   title: string
   authors: string | null
   abstract: string | null
@@ -39,6 +48,7 @@ export interface Paper {
 
 export interface PaperListItem {
   id: string
+  workspace_id: string | null
   title: string
   authors: string | null
   publication_year: number | null
@@ -76,6 +86,7 @@ export interface Message {
 
 export interface Chat {
   id: string
+  workspace_id: string | null
   title: string
   created_at: string
   messages: Message[]

@@ -58,6 +58,7 @@ export const useAuthStore = create<AuthState>((set) => ({
   logout: () => {
     localStorage.removeItem('pm_token')
     localStorage.removeItem('pm_user')
+    localStorage.removeItem('pm_workspace_id')
     set({ user: null, token: null })
     window.location.href = '/auth/login'
   },

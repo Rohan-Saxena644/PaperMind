@@ -33,10 +33,31 @@ class TokenOut(BaseModel):
     user: UserOut
 
 
+class WorkspaceCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    description: Optional[str] = Field(default=None, max_length=1000)
+
+
+class WorkspaceUpdate(BaseModel):
+    name: Optional[str] = Field(default=None, min_length=1, max_length=120)
+    description: Optional[str] = Field(default=None, max_length=1000)
+
+
+class WorkspaceOut(BaseModel):
+    id: UUID
+    name: str
+    description: Optional[str]
+    is_default: bool
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
 # ── Papers ────────────────────────────────────────────────────────────────────
 
 class PaperOut(BaseModel):
     id: UUID
+    workspace_id: UUID
     title: str
     authors: Optional[str]
     abstract: Optional[str]
@@ -67,6 +88,7 @@ class PaperOut(BaseModel):
 
 class PaperListOut(BaseModel):
     id: UUID
+    workspace_id: UUID
     title: str
     authors: Optional[str]
     publication_year: Optional[int]
@@ -109,6 +131,7 @@ class MessageOut(BaseModel):
 
 class ChatOut(BaseModel):
     id: UUID
+    workspace_id: UUID
     title: str
     created_at: datetime
     messages: list[MessageOut] = []

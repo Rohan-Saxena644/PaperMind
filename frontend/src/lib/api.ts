@@ -10,6 +10,9 @@ api.interceptors.request.use((config) => {
   if (typeof window !== 'undefined') {
     const token = localStorage.getItem('pm_token')
     if (token) config.headers.Authorization = `Bearer ${token}`
+
+    const workspaceId = localStorage.getItem('pm_workspace_id')
+    if (workspaceId) config.headers['X-Workspace-Id'] = workspaceId
   }
   return config
 })
@@ -21,6 +24,7 @@ api.interceptors.response.use(
     if (err.response?.status === 401 && typeof window !== 'undefined') {
       localStorage.removeItem('pm_token')
       localStorage.removeItem('pm_user')
+      localStorage.removeItem('pm_workspace_id')
       window.location.href = '/auth/login'
     }
     return Promise.reject(err)

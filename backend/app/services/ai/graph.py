@@ -29,6 +29,7 @@ def _relationship_type(value: str | None) -> str:
 def write_paper_graph(
     *,
     user_id: str,
+    workspace_id: str,
     paper_id: str,
     title: str,
     authors: list[str],
@@ -43,6 +44,7 @@ def write_paper_graph(
             session.execute_write(
                 _write_paper_graph_tx,
                 user_id,
+                workspace_id,
                 paper_id,
                 title,
                 authors,
@@ -51,13 +53,15 @@ def write_paper_graph(
             )
 
 
-def _write_paper_graph_tx(tx, user_id, paper_id, title, authors, concepts, relationships):
+def _write_paper_graph_tx(tx, user_id, workspace_id, paper_id, title, authors, concepts, relationships):
     tx.run(
         """
         MERGE (p:Paper {user_id: $user_id, id: $paper_id})
-        SET p.title = $title
+        SET p.title = $title,
+            p.workspace_id = $workspace_id
         """,
         user_id=user_id,
+        workspace_id=workspace_id,
         paper_id=paper_id,
         title=title,
     )
@@ -67,13 +71,14 @@ def _write_paper_graph_tx(tx, user_id, paper_id, title, authors, concepts, relat
             continue
         tx.run(
             """
-            MERGE (a:Author {user_id: $user_id, name_key: $name_key})
+            MERGE (a:Author {user_id: $user_id, workspace_id: $workspace_id, name_key: $name_key})
             SET a.name = $name
             WITH a
             MATCH (p:Paper {user_id: $user_id, id: $paper_id})
             MERGE (p)-[:WRITTEN_BY]->(a)
             """,
             user_id=user_id,
+            workspace_id=workspace_id,
             paper_id=paper_id,
             name_key=_key(author),
             name=author.strip(),
@@ -87,7 +92,7 @@ def _write_paper_graph_tx(tx, user_id, paper_id, title, authors, concepts, relat
         rel_type = "INTRODUCES" if category in {"introduced", "contribution", "method"} else "USES"
         tx.run(
             f"""
-            MERGE (c:Concept {{user_id: $user_id, name_key: $name_key}})
+            MERGE (c:Concept {{user_id: $user_id, workspace_id: $workspace_id, name_key: $name_key}})
             SET c.name = $name,
                 c.category = $category
             WITH c
@@ -95,6 +100,7 @@ def _write_paper_graph_tx(tx, user_id, paper_id, title, authors, concepts, relat
             MERGE (p)-[:{rel_type}]->(c)
             """,
             user_id=user_id,
+            workspace_id=workspace_id,
             paper_id=paper_id,
             name_key=_key(name),
             name=name,
@@ -109,32 +115,34 @@ def _write_paper_graph_tx(tx, user_id, paper_id, title, authors, concepts, relat
         rel_type = _relationship_type(relationship.get("type"))
         tx.run(
             f"""
-            MATCH (a:Concept {{user_id: $user_id, name_key: $source_key}})
-            MATCH (b:Concept {{user_id: $user_id, name_key: $target_key}})
+            MATCH (a:Concept {{user_id: $user_id, workspace_id: $workspace_id, name_key: $source_key}})
+            MATCH (b:Concept {{user_id: $user_id, workspace_id: $workspace_id, name_key: $target_key}})
             MERGE (a)-[:{rel_type}]->(b)
             """,
             user_id=user_id,
+            workspace_id=workspace_id,
             source_key=_key(source),
             target_key=_key(target),
         )
 
 
-def get_paper_graph(user_id: str, paper_id: str) -> dict:
+def get_paper_graph(user_id: str, workspace_id: str, paper_id: str) -> dict:
     with _driver() as driver:
         with driver.session() as session:
-            result = session.execute_read(_get_paper_graph_tx, user_id, paper_id)
+            result = session.execute_read(_get_paper_graph_tx, user_id, workspace_id, paper_id)
     return result
 
 
-def _get_paper_graph_tx(tx, user_id: str, paper_id: str) -> dict:
+def _get_paper_graph_tx(tx, user_id: str, workspace_id: str, paper_id: str) -> dict:
     records = tx.run(
         """
-        MATCH (p:Paper {user_id: $user_id, id: $paper_id})
+        MATCH (p:Paper {user_id: $user_id, workspace_id: $workspace_id, id: $paper_id})
         OPTIONAL MATCH (p)-[r]->(n)
         WHERE n:Concept OR n:Author
         RETURN p, collect({rel: type(r), node: n}) AS neighbors
         """,
         user_id=user_id,
+        workspace_id=workspace_id,
         paper_id=paper_id,
     ).single()
 
@@ -160,21 +168,22 @@ def _get_paper_graph_tx(tx, user_id: str, paper_id: str) -> dict:
     return {"nodes": nodes, "edges": _dedupe_edges(edges)}
 
 
-def get_knowledge_map(user_id: str, limit: int = 200) -> dict:
+def get_knowledge_map(user_id: str, workspace_id: str, limit: int = 200) -> dict:
     with _driver() as driver:
         with driver.session() as session:
-            return session.execute_read(_get_knowledge_map_tx, user_id, limit)
+            return session.execute_read(_get_knowledge_map_tx, user_id, workspace_id, limit)
 
 
-def _get_knowledge_map_tx(tx, user_id: str, limit: int) -> dict:
+def _get_knowledge_map_tx(tx, user_id: str, workspace_id: str, limit: int) -> dict:
     records = tx.run(
         """
-        MATCH (p:Paper {user_id: $user_id})-[r]->(n)
+        MATCH (p:Paper {user_id: $user_id, workspace_id: $workspace_id})-[r]->(n)
         WHERE n:Concept OR n:Author
         RETURN p, r, n
         LIMIT $limit
         """,
         user_id=user_id,
+        workspace_id=workspace_id,
         limit=limit,
     )
 
@@ -193,11 +202,12 @@ def _get_knowledge_map_tx(tx, user_id: str, limit: int) -> dict:
 
     concept_records = tx.run(
         """
-        MATCH (a:Concept {user_id: $user_id})-[r:RELATED_TO|USES|INTRODUCES]->(b:Concept {user_id: $user_id})
+        MATCH (a:Concept {user_id: $user_id, workspace_id: $workspace_id})-[r:RELATED_TO|USES|INTRODUCES]->(b:Concept {user_id: $user_id, workspace_id: $workspace_id})
         RETURN a, r, b
         LIMIT $limit
         """,
         user_id=user_id,
+        workspace_id=workspace_id,
         limit=limit,
     )
     for record in concept_records:

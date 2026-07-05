@@ -5,7 +5,7 @@ import hashlib
 import random
 
 from app.db.session import get_db
-from app.models.models import User, Paper, PaperStatus, FlashcardReview
+from app.models.models import User, Paper, PaperStatus, FlashcardReview, Workspace
 from app.schemas.schemas import (
     CompareRequest,
     CompareResponse,
@@ -14,7 +14,7 @@ from app.schemas.schemas import (
     QuizReviewRequest,
     QuizReviewResponse,
 )
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, get_current_workspace
 from app.services.ai.gemini import AIRateLimitError, compare_papers
 
 router = APIRouter(prefix="/papers", tags=["papers"])
@@ -72,6 +72,7 @@ def compare(
     payload: CompareRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    workspace: Workspace = Depends(get_current_workspace),
 ):
     if len(payload.paper_ids) < 2:
         raise HTTPException(status_code=400, detail="Select at least 2 papers to compare")
@@ -80,7 +81,11 @@ def compare(
 
     papers = (
         db.query(Paper)
-        .filter(Paper.id.in_(payload.paper_ids), Paper.user_id == current_user.id)
+        .filter(
+            Paper.id.in_(payload.paper_ids),
+            Paper.user_id == current_user.id,
+            Paper.workspace_id == workspace.id,
+        )
         .all()
     )
 
@@ -121,11 +126,16 @@ def random_quiz(
     count: int = 10,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    workspace: Workspace = Depends(get_current_workspace),
 ):
     """Pull due flashcards first, then fill with future/new cards if needed."""
     papers = (
         db.query(Paper)
-        .filter(Paper.user_id == current_user.id, Paper.status == PaperStatus.READY)
+        .filter(
+            Paper.user_id == current_user.id,
+            Paper.workspace_id == workspace.id,
+            Paper.status == PaperStatus.READY,
+        )
         .all()
     )
 
@@ -148,6 +158,7 @@ def random_quiz(
         db.query(FlashcardReview)
         .filter(
             FlashcardReview.user_id == current_user.id,
+            FlashcardReview.workspace_id == workspace.id,
             FlashcardReview.card_key.in_([card[1] for card in raw_cards]),
         )
         .all()
@@ -184,10 +195,15 @@ def review_quiz_card(
     payload: QuizReviewRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    workspace: Workspace = Depends(get_current_workspace),
 ):
     paper = (
         db.query(Paper)
-        .filter(Paper.id == payload.paper_id, Paper.user_id == current_user.id)
+        .filter(
+            Paper.id == payload.paper_id,
+            Paper.user_id == current_user.id,
+            Paper.workspace_id == workspace.id,
+        )
         .first()
     )
     if paper is None:
@@ -213,6 +229,7 @@ def review_quiz_card(
         db.query(FlashcardReview)
         .filter(
             FlashcardReview.user_id == current_user.id,
+            FlashcardReview.workspace_id == workspace.id,
             FlashcardReview.card_key == payload.card_key,
         )
         .first()
@@ -220,6 +237,7 @@ def review_quiz_card(
     if review is None:
         review = FlashcardReview(
             user_id=current_user.id,
+            workspace_id=workspace.id,
             paper_id=paper.id,
             card_key=payload.card_key,
             question=payload.question.strip(),
